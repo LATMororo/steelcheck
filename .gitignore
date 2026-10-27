@@ -1,0 +1,10 @@
+# Build output
+build/
+
+# Editors and operating systems
+*.swp
+*~
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
