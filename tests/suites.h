@@ -12,5 +12,6 @@ void test_version_suite   ();
 void test_status_suite    ();
 void test_buffer_suite    ();
 void test_lines_suite     ();
+void test_view_suite      ();
 
 #endif // STEELCHECK_SUITES_H

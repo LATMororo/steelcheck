@@ -3,13 +3,13 @@
 
 #include "steelcheck/compat.h"
 #include "steelcheck/status.h"
+#include "steelcheck/view.h"
 
 #include <stddef.h>
 
 /*
- *  SteelCheckBuffer owns its memory, while SteelCheckView borrows it. A view never frees the
- *  memory, and it becomes invalid when the underlying buffer is freed, reallocated, or otherwise
- *  ceases to exist.
+ *  SteelCheckBuffer owns its memory; a SteelCheckView (view.h) of it borrows that memory and 
+ *  becomes invalid when the buffer is freed.
  */
 
 typedef struct SteelCheckBuffer
@@ -17,12 +17,6 @@ typedef struct SteelCheckBuffer
   size_t size;         // file bytes, excluding the terminating '\0'
   char*  data;         // file contents followed by '\0'; nullptr when the buffer is empty
 } SteelCheckBuffer;
-
-typedef struct SteelCheckView
-{
-  size_t      length;  // bytes visible through the view
-  const char* data;    // borrowed, read-only memory; not necessarily '\0'-terminated
-} SteelCheckView;
 
 /*
  *  Reads the whole file at path into buff.

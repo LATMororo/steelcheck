@@ -30,6 +30,12 @@ const char* steelcheck_status_message( SteelCheckStatus status )
 
     case STEELCHECK_ERROR_INVALID_ARGUMENT:
       return "invalid argument";
+
+    case STEELCHECK_ERROR_SYNTAX:
+      return "syntax error";
+
+    case STEELCHECK_ERROR_HEADER:
+      return "invalid header";
   }
 
   return "unknown status";

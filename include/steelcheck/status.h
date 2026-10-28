@@ -16,6 +16,8 @@ enum SteelCheckStatus : int
   STEELCHECK_ERROR_NO_MEMORY        = 4,
   STEELCHECK_ERROR_OVERFLOW         = 5,
   STEELCHECK_ERROR_INVALID_ARGUMENT = 6,
+  STEELCHECK_ERROR_SYNTAX           = 7,  // malformed CSV line: quote, '\0' byte, wrong field count
+  STEELCHECK_ERROR_HEADER           = 8,  // CSV header: missing, duplicate or empty column name
 };
 
 typedef enum SteelCheckStatus SteelCheckStatus;

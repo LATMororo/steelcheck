@@ -51,7 +51,7 @@ static bool lines_match_ (const char* input, size_t length, size_t count,
 
   for ( size_t i = 0; i < count; i++ )
   {
-    if ( !steelcheck_lines_next ( &iter, &line, &line_number ) )
+    if ( !steelcheck_lines_next( &iter, &line, &line_number ) )
     {
       fprintf ( stderr, "    only %zu line(s), expected %zu\n", i, count );
       return false;
@@ -63,7 +63,7 @@ static bool lines_match_ (const char* input, size_t length, size_t count,
       return false;
     }
 
-    if ( !view_eq_ ( line, expected[i], strlen ( expected[i] ) ) )
+    if ( !view_eq_( line, expected[i], strlen ( expected[i] ) ) )
     {
       fprintf ( stderr, "    line %zu is \"%.*s\", expected \"%s\"\n",
                 i + 1, (int) line.length, line.data, expected[i] );
@@ -71,7 +71,7 @@ static bool lines_match_ (const char* input, size_t length, size_t count,
     }
   }
 
-  if ( steelcheck_lines_next ( &iter, &line, &line_number ) )
+  if ( steelcheck_lines_next( &iter, &line, &line_number ) )
   {
     fprintf ( stderr, "    more than the expected %zu line(s)\n", count );
     return false;
@@ -145,14 +145,14 @@ static void test_lines_embedded_nul ()
 
   steelcheck_lines_init ( &iter, (SteelCheckView) { .length = sizeof input - 1, .data = input } );
 
-  CHECK ( steelcheck_lines_next ( &iter, &line, &line_number ) );
+  CHECK ( steelcheck_lines_next( &iter, &line, &line_number ) );
   CHECK ( view_eq_ ( line, "a\0b", 3 ) );
 
-  CHECK ( steelcheck_lines_next ( &iter, &line, &line_number ) );
+  CHECK ( steelcheck_lines_next( &iter, &line, &line_number ) );
   CHECK ( view_eq_ ( line, "c", 1 ) );
   CHECK_SIZE_EQ ( line_number, 2 );
 
-  CHECK ( !steelcheck_lines_next ( &iter, &line, &line_number ) );
+  CHECK ( !steelcheck_lines_next( &iter, &line, &line_number ) );
 }
 
 static void test_lines_null_arguments ()
@@ -170,7 +170,7 @@ static void test_lines_null_arguments ()
 
   // The rejected calls did not move the iterator: the line is still there.
 
-  CHECK ( steelcheck_lines_next ( &iter, &line, &line_number ) );
+  CHECK ( steelcheck_lines_next( &iter, &line, &line_number ) );
   CHECK_SIZE_EQ ( line_number, 1 );
 }
 
@@ -204,10 +204,10 @@ static void test_lines_fixture_files ()
 {
   // Same three lines, whatever the line endings, BOM, or final newline.
 
-  CHECK ( file_has_fixture_lines_ ( "tests/data/lf.txt" ) );
-  CHECK ( file_has_fixture_lines_ ( "tests/data/crlf.txt" ) );
-  CHECK ( file_has_fixture_lines_ ( "tests/data/bom.txt" ) );
-  CHECK ( file_has_fixture_lines_ ( "tests/data/no_final_newline.txt" ) );
+  CHECK ( file_has_fixture_lines_( "tests/data/lf.txt" ) );
+  CHECK ( file_has_fixture_lines_( "tests/data/crlf.txt" ) );
+  CHECK ( file_has_fixture_lines_( "tests/data/bom.txt" ) );
+  CHECK ( file_has_fixture_lines_( "tests/data/no_final_newline.txt" ) );
 }
 
 static void test_lines_gerdau_catalog ()
@@ -216,30 +216,30 @@ static void test_lines_gerdau_catalog ()
 
   SteelCheckBuffer buff = {};
 
-  CHECK_INT_EQ ( steelcheck_buffer_load ( &buff, "data/gerdau_w_hp.csv" ), STEELCHECK_OK );
+  CHECK_INT_EQ ( steelcheck_buffer_load( &buff, "data/gerdau_w_hp.csv" ), STEELCHECK_OK );
 
   SteelCheckLines iter        = {};
   SteelCheckView  line        = {};
   size_t          line_number = 0;
   size_t          count       = 0;
 
-  steelcheck_lines_init ( &iter, steelcheck_buffer_view ( &buff ) );
+  steelcheck_lines_init ( &iter, steelcheck_buffer_view( &buff ) );
 
-  while ( steelcheck_lines_next ( &iter, &line, &line_number ) )
+  while ( steelcheck_lines_next( &iter, &line, &line_number ) )
   {
     count++;
 
     CHECK ( line.length > 0 );
-    CHECK ( memchr ( line.data, '\r', line.length ) == nullptr );
+    CHECK ( memchr( line.data, '\r', line.length ) == nullptr );
 
     if ( line_number == 9 )
     {
-      CHECK ( line.length > 12 && memcmp ( line.data, "designation,", 12 ) == 0 );
+      CHECK ( line.length > 12 && memcmp( line.data, "designation,", 12 ) == 0 );
     }
 
     if ( line_number == 117 )
     {
-      CHECK ( line.length > 11 && memcmp ( line.data, "W610x217.0,", 11 ) == 0 );
+      CHECK ( line.length > 11 && memcmp( line.data, "W610x217.0,", 11 ) == 0 );
     }
   }
 
