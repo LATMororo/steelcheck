@@ -408,7 +408,7 @@ static void test_rows ()
   CHECK ( steelcheck_view_equals_cstr( fields[spec_bf_],          "100" ) );
   CHECK ( steelcheck_view_is_empty( fields[spec_rt_] ) );
 
-  // An empty field is allowed here (whether a value is required is checked later, in step 5).
+  // An empty field is allowed here (whether a value is required is checked later).
 
   CHECK_INT_EQ ( steelcheck_csv_split_row( &header, v_( "100,,W150x13.0," ), 3, fields,
                                             spec_count_, &reporter ),
@@ -470,8 +470,7 @@ static void test_rows_errors ()
 //==================================================================================================
 
 /*
- *  Every column of the catalog, plus r_mm, which the catalog does not have (optional). In step 5
- *  this table moves to the section module.
+ *  Every column of the catalog, plus r_mm, which the catalog does not have (optional). 
  */
 
 static const SteelCheckColumnSpec gerdau_specs_[] =
@@ -509,7 +508,7 @@ static void test_gerdau_catalog ()
   size_t comments    = 0;
   size_t rows        = 0;
 
-  steelcheck_lines_init ( &lines, steelcheck_buffer_view ( &buff ) );
+  steelcheck_lines_init ( &lines, steelcheck_buffer_view( &buff ) );
 
   while ( steelcheck_lines_next( &lines, &line, &line_number ) )
   {

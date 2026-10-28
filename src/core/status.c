@@ -36,6 +36,15 @@ const char* steelcheck_status_message ( SteelCheckStatus status )
 
     case STEELCHECK_ERROR_HEADER:
       return "invalid header";
+
+    case STEELCHECK_ERROR_MISSING_VALUE:
+      return "missing value";
+
+    case STEELCHECK_ERROR_NUMBER:
+      return "invalid number";
+
+    case STEELCHECK_ERROR_RANGE:
+      return "number of out of range";
   }
 
   return "unknown status";

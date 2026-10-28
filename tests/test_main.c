@@ -15,6 +15,7 @@ int main ()
   test_lines_suite     ();
   test_view_suite      ();
   test_csv_suite       ();
+  test_number_suite    ();
 
-  return test_summary ();
+  return test_summary  ();
 }
