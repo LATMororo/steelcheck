@@ -4,7 +4,7 @@
 //  steelcheck_status_message
 //==================================================================================================
 
-const char* steelcheck_status_message( SteelCheckStatus status )
+const char* steelcheck_status_message ( SteelCheckStatus status )
 {
   // Handle the status cases.
 

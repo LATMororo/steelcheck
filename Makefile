@@ -32,7 +32,8 @@ CSTD := -std=c23
 
 WARNINGS := -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion \
             -Wdouble-promotion -Wformat=2 -Wstrict-prototypes -Wmissing-prototypes \
-            -Wformat-security -Wnull-dereference -Wcast-qual -Wundef -Wvla
+			-Wmissing-declarations -Wformat-security -Wnull-dereference -Wcast-qual \
+			-Wundef -Wvla
 
 ifeq ($(WERROR),1)
   WARNINGS += -Werror
