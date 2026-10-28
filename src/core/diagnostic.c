@@ -31,9 +31,9 @@ void steelcheck_report ( const SteelCheckReporter* reporter, SteelCheckSeverity 
   // terminates the message, truncating it if necessary.
 
   va_list args;
-  va_start  ( args, format );
+  va_start ( args, format );
   vsnprintf ( diagnostic.message, sizeof diagnostic.message, format, args );
-  va_end    ( args );
+  va_end ( args );
 
   reporter->report ( reporter->context, &diagnostic );
 }

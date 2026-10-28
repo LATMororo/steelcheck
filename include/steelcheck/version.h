@@ -1,7 +1,7 @@
 #ifndef STEELCHECK_VERSION_H
 #define STEELCHECK_VERSION_H
 
-//#include "steelcheck/compat.h"
+#include "steelcheck/compat.h"
 
 /*
  *  Version numbers, written only here. They are macros because the preprocessor,

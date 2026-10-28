@@ -88,7 +88,7 @@ SteelCheckLineKind steelcheck_csv_classify ( SteelCheckView line, SteelCheckMeta
   // what comes before the first ':', trimmed.
 
   SteelCheckView text  = { .length = trimmed.length - 1, .data = trimmed.data + 1 };
-  const char*    colon = text.length > 0 ? memchr( text.data, ':', text.length ) : nullptr;
+  const char*    colon = text.length > 0 ? memchr ( text.data, ':', text.length ) : nullptr;
 
   if ( colon == nullptr )
   {
@@ -161,7 +161,7 @@ bool steelcheck_fields_next ( SteelCheckFields* iter, SteelCheckView* field, siz
 
   const char* start     = iter->curr;
   size_t      remaining = (size_t) ( iter->end - start );
-  const char* comma     = remaining > 0 ? memchr( start, ',', remaining ) : nullptr;
+  const char* comma     = remaining > 0 ? memchr ( start, ',', remaining ) : nullptr;
   const char* stop      = nullptr;
 
   if ( comma != nullptr )

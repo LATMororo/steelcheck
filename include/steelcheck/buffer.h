@@ -8,7 +8,7 @@
 #include <stddef.h>
 
 /*
- *  SteelCheckBuffer owns its memory; a SteelCheckView (view.h) of it borrows that memory and 
+ *  SteelCheckBuffer owns its memory; a SteelCheckView (view.h) of it borrows that memory and
  *  becomes invalid when the buffer is freed.
  */
 

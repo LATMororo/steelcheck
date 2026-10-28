@@ -24,7 +24,7 @@ enum steelcheck_exit : int
  *  only once, in the calls in main(), so the code and the help text are easy to keep in sync.
  */
 
-static bool is_option_ ( const char*  arg, const char*  short_name, const char*  long_name )
+static bool is_option_ ( const char* arg, const char* short_name, const char* long_name )
 {
   return strcmp ( arg, short_name ) == 0 || strcmp ( arg, long_name ) == 0;
 }
@@ -33,7 +33,7 @@ static bool is_option_ ( const char*  arg, const char*  short_name, const char* 
 //  print_usage_
 //==================================================================================================
 
-static void print_usage_ ( FILE*  stream )
+static void print_usage_ ( FILE* stream )
 {
   fputs ( "Usage: steelcheck [OPTION]\n"
           "Check W and HP steel cross sections (ABNT NBR 8800:2024).\n"
@@ -59,15 +59,15 @@ static void print_try_help_ ()
 
 static void print_version_ ()
 {
-  printf ( "steelcheck %s\n", steelcheck_version () );
-  printf ( "%s\n", steelcheck_build_info () );
+  printf ( "steelcheck %s\n", steelcheck_version() );
+  printf ( "%s\n", steelcheck_build_info() );
 }
 
 //==================================================================================================
 //  main
 //==================================================================================================
 
-int main (int argc, char* argv[static 1])
+int main ( int argc, char* argv[] )
 {
   // No argument: show how to use the program.
 
@@ -95,14 +95,14 @@ int main (int argc, char* argv[static 1])
 
   const char* arg = argv[1];
 
-  if ( is_option_ ( arg, "-h", "--help" ) )
+  if ( is_option_( arg, "-h", "--help" ) )
   {
     print_usage_ ( stdout );
 
     return STEELCHECK_EXIT_SUCCESS;
   }
 
-  if ( is_option_ ( arg, "-V", "--version" ) )
+  if ( is_option_( arg, "-V", "--version" ) )
   {
     print_version_ ();
 

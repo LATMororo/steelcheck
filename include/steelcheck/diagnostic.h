@@ -25,7 +25,7 @@ typedef enum SteelCheckSeverity : int
  *  Size of the message, including its '\0'. Longer messages are truncated (safely, by vsnprintf).
  */
 
-constexpr size_t steelcheck_diagnostic_message_size = 160u;
+constexpr size_t steelcheck_diagnostic_message_size = 160;
 
 typedef struct SteelCheckDiagnostic
 {

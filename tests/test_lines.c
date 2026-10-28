@@ -24,7 +24,7 @@ static const char* const fixture_lines_[] = { "first line", "second line", "thir
 //  view_eq_
 //==================================================================================================
 
-static bool view_eq_ (SteelCheckView view, const char* expected, size_t expected_length)
+static bool view_eq_ ( SteelCheckView view, const char* expected, size_t expected_length )
 {
   return view.length == expected_length
       && ( expected_length == 0 || memcmp ( view.data, expected, expected_length ) == 0 );
@@ -40,8 +40,8 @@ static bool view_eq_ (SteelCheckView view, const char* expected, size_t expected
  *  (...) ), so a failure reports the line of the test case itself.
  */
 
-static bool lines_match_ (const char* input, size_t length, size_t count,
-                          const char* const expected[])
+static bool lines_match_ ( const char* input, size_t length, size_t count,
+                           const char* const expected[] )
 {
   SteelCheckLines iter        = {};
   SteelCheckView  line        = {};
@@ -63,7 +63,7 @@ static bool lines_match_ (const char* input, size_t length, size_t count,
       return false;
     }
 
-    if ( !view_eq_( line, expected[i], strlen ( expected[i] ) ) )
+    if ( !view_eq_( line, expected[i], strlen( expected[i] ) ) )
     {
       fprintf ( stderr, "    line %zu is \"%.*s\", expected \"%s\"\n",
                 i + 1, (int) line.length, line.data, expected[i] );
@@ -88,49 +88,50 @@ static bool lines_match_ (const char* input, size_t length, size_t count,
 
 static void test_lines_endings ()
 {
-  CHECK ( lines_match_ ( LIT_ ( "a\nb\n" ),     2, (const char* const[]) { "a", "b" } ) );
-  CHECK ( lines_match_ ( LIT_ ( "a\nb" ),       2, (const char* const[]) { "a", "b" } ) );
-  CHECK ( lines_match_ ( LIT_ ( "a\r\nb\r\n" ), 2, (const char* const[]) { "a", "b" } ) );
-  CHECK ( lines_match_ ( LIT_ ( "a\r\nb\r" ),   2, (const char* const[]) { "a", "b" } ) );
-  CHECK ( lines_match_ ( LIT_ ( "a\nb\r\n" ),   2, (const char* const[]) { "a", "b" } ) );
+  CHECK ( lines_match_( LIT_( "a\nb\n" ),     2, (const char* const[]) { "a", "b" } ) );
+  CHECK ( lines_match_( LIT_( "a\nb" ),       2, (const char* const[]) { "a", "b" } ) );
+  CHECK ( lines_match_( LIT_( "a\r\nb\r\n" ), 2, (const char* const[]) { "a", "b" } ) );
+  CHECK ( lines_match_( LIT_( "a\r\nb\r" ),   2, (const char* const[]) { "a", "b" } ) );
+  CHECK ( lines_match_( LIT_( "a\nb\r\n" ),   2, (const char* const[]) { "a", "b" } ) );
 
   // A '\r' inside a line stays: CR-only line endings (old Mac) are not supported.
 
-  CHECK ( lines_match_ ( LIT_ ( "a\rb\n" ),     1, (const char* const[]) { "a\rb" } ) );
+  CHECK ( lines_match_( LIT_( "a\rb\n" ),     1, (const char* const[]) { "a\rb" } ) );
 
   // Only one '\r' is removed.
 
-  CHECK ( lines_match_ ( LIT_ ( "a\r\r\n" ),    1, (const char* const[]) { "a\r" } ) );
+  CHECK ( lines_match_( LIT_( "a\r\r\n" ),    1, (const char* const[]) { "a\r" } ) );
 }
 
 static void test_lines_empty ()
 {
-  CHECK ( lines_match_ ( LIT_ ( "" ),           0, nullptr ) );
-  CHECK ( lines_match_ ( LIT_ ( "\n" ),         1, (const char* const[]) { "" } ) );
-  CHECK ( lines_match_ ( LIT_ ( "\n\n" ),       2, (const char* const[]) { "", "" } ) );
-  CHECK ( lines_match_ ( LIT_ ( "\r\n" ),       1, (const char* const[]) { "" } ) );
-  CHECK ( lines_match_ ( LIT_ ( "a\n\nb\n" ),   3, (const char* const[]) { "a", "", "b" } ) );
+  CHECK ( lines_match_( LIT_( "" ),           0, nullptr ) );
+  CHECK ( lines_match_( LIT_( "\n" ),         1, (const char* const[]) { "" } ) );
+  CHECK ( lines_match_( LIT_( "\n\n" ),       2, (const char* const[]) { "", "" } ) );
+  CHECK ( lines_match_( LIT_( "\r\n" ),       1, (const char* const[]) { "" } ) );
+  CHECK ( lines_match_( LIT_( "a\n\nb\n" ),   3, (const char* const[]) { "a", "", "b" } ) );
 
   // An empty view (no data at all) has no lines.
 
-  CHECK ( lines_match_ ( nullptr, 0,            0, nullptr ) );
+  CHECK ( lines_match_( nullptr, 0,            0, nullptr ) );
 }
 
 static void test_lines_bom ()
 {
   // The BOM is written as a separate literal: "\xBFa" would be read as one hex escape, \xBFa.
 
-  CHECK ( lines_match_ ( LIT_ ( "\xEF\xBB\xBF" "a\n" ), 1, (const char* const[]) { "a" } ) );
-  CHECK ( lines_match_ ( LIT_ ( "\xEF\xBB\xBF" ),       0, nullptr ) );
+  CHECK ( lines_match_( LIT_( "\xEF\xBB\xBF" "a\n" ), 1, (const char* const[]) { "a" } ) );
+  CHECK ( lines_match_( LIT_( "\xEF\xBB\xBF" ),       0, nullptr ) );
 
   // A BOM after the start is ordinary data.
 
-  CHECK ( lines_match_ ( LIT_ ( "a\n" "\xEF\xBB\xBF" "b\n" ), 2,
-                         (const char* const[]) { "a", "\xEF\xBB\xBF" "b" } ) );
+  CHECK ( lines_match_( LIT_( "a\n" "\xEF\xBB\xBF" "b\n" ), 2,
+                        (const char* const[]) { "a", "\xEF\xBB\xBF" "b" } ) );
 
   // An incomplete BOM is not skipped.
 
-  CHECK ( lines_match_ ( LIT_ ( "\xEF\xBB" "a" ),       1, (const char* const[]) { "\xEF\xBB" "a" } ) );
+  CHECK ( lines_match_( LIT_( "\xEF\xBB" "a" ),       1,
+                        (const char* const[]) { "\xEF\xBB" "a" } ) );
 }
 
 static void test_lines_embedded_nul ()
@@ -146,10 +147,10 @@ static void test_lines_embedded_nul ()
   steelcheck_lines_init ( &iter, (SteelCheckView) { .length = sizeof input - 1, .data = input } );
 
   CHECK ( steelcheck_lines_next( &iter, &line, &line_number ) );
-  CHECK ( view_eq_ ( line, "a\0b", 3 ) );
+  CHECK ( view_eq_( line, "a\0b", 3 ) );
 
   CHECK ( steelcheck_lines_next( &iter, &line, &line_number ) );
-  CHECK ( view_eq_ ( line, "c", 1 ) );
+  CHECK ( view_eq_( line, "c", 1 ) );
   CHECK_SIZE_EQ ( line_number, 2 );
 
   CHECK ( !steelcheck_lines_next( &iter, &line, &line_number ) );
@@ -164,9 +165,9 @@ static void test_lines_null_arguments ()
   steelcheck_lines_init ( nullptr, (SteelCheckView) {} );      // must not crash
   steelcheck_lines_init ( &iter, (SteelCheckView) { .length = 2, .data = "a\n" } );
 
-  CHECK ( !steelcheck_lines_next ( nullptr, &line, &line_number ) );
-  CHECK ( !steelcheck_lines_next ( &iter, nullptr, &line_number ) );
-  CHECK ( !steelcheck_lines_next ( &iter, &line, nullptr ) );
+  CHECK ( !steelcheck_lines_next( nullptr, &line, &line_number ) );
+  CHECK ( !steelcheck_lines_next( &iter, nullptr, &line_number ) );
+  CHECK ( !steelcheck_lines_next( &iter, &line, nullptr ) );
 
   // The rejected calls did not move the iterator: the line is still there.
 
@@ -182,11 +183,11 @@ static void test_lines_null_arguments ()
  *  Loads path and checks that it holds exactly the three fixture lines.
  */
 
-static bool file_has_fixture_lines_ (const char* path)
+static bool file_has_fixture_lines_ ( const char* path )
 {
   SteelCheckBuffer buff = {};
 
-  if ( steelcheck_buffer_load ( &buff, path ) != STEELCHECK_OK )
+  if ( steelcheck_buffer_load( &buff, path ) != STEELCHECK_OK )
   {
     fprintf ( stderr, "    cannot load %s\n", path );
     return false;

@@ -1,7 +1,7 @@
 #include "steelcheck/view.h"
 
-#include <string.h>
 #include <limits.h>
+#include <string.h>
 
 //==================================================================================================
 //  is_blank_
@@ -29,7 +29,7 @@ SteelCheckView steelcheck_view_from_cstr ( const char* string )
     return (SteelCheckView) {};
   }
 
-  return (SteelCheckView) { .length = strlen( string ), .data = string };
+  return (SteelCheckView) { .length = strlen ( string ), .data = string };
 }
 
 //==================================================================================================
@@ -38,7 +38,7 @@ SteelCheckView steelcheck_view_from_cstr ( const char* string )
 
 SteelCheckView steelcheck_view_trim ( SteelCheckView view )
 {
-   // An empty view may have data == nullptr: return it untouched, never index into it.
+  // An empty view may have data == nullptr: return it untouched, never index into it.
 
   if ( view.length == 0 )
   {
@@ -83,7 +83,7 @@ bool steelcheck_view_equals ( SteelCheckView a, SteelCheckView b )
     return false;
   }
 
-  return a.length == 0 || memcmp( a.data, b.data, a.length ) == 0;
+  return a.length == 0 || memcmp ( a.data, b.data, a.length ) == 0;
 }
 
 //==================================================================================================
@@ -108,7 +108,7 @@ bool steelcheck_view_starts_with ( SteelCheckView view, const char* prefix )
     return false;
   }
 
-  return p.length == 0 || memcmp( view.data, p.data, p.length ) == 0;
+  return p.length == 0 || memcmp ( view.data, p.data, p.length ) == 0;
 }
 
 //==================================================================================================
@@ -117,5 +117,5 @@ bool steelcheck_view_starts_with ( SteelCheckView view, const char* prefix )
 
 int steelcheck_view_print_length ( SteelCheckView view )
 {
-  return view.length > (size_t)INT_MAX ? INT_MAX : (int)view.length;
+  return view.length > (size_t) INT_MAX ? INT_MAX : (int) view.length;
 }

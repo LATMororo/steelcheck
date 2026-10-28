@@ -2,7 +2,7 @@
 #define STEELCHECK_LINES_H
 
 #include "steelcheck/compat.h"
-#include "steelcheck/buffer.h"
+#include "steelcheck/view.h"
 
 #include <stddef.h>
 

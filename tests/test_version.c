@@ -16,7 +16,7 @@ static void test_version_string ()
                      STEELCHECK_VERSION_MAJOR, STEELCHECK_VERSION_MINOR, STEELCHECK_VERSION_PATCH );
 
   CHECK ( n > 0 && (size_t) n < sizeof expected );
-  CHECK_STR_EQ ( steelcheck_version (), expected );
+  CHECK_STR_EQ ( steelcheck_version(), expected );
 }
 
 static void test_build_info ()
@@ -24,7 +24,7 @@ static void test_build_info ()
   const char* info = steelcheck_build_info ();
 
   CHECK ( info != nullptr );
-  CHECK ( strstr ( info, "C standard 20" ) != nullptr );   // 202311L, or 202000L on GCC 14
+  CHECK ( strstr( info, "C standard 20" ) != nullptr );   // 202311L, or 202000L on GCC 14
 }
 
 //==================================================================================================

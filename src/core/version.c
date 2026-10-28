@@ -43,5 +43,5 @@ const char* steelcheck_version ()
 
 const char* steelcheck_build_info ()
 {
-  return STEELCHECK_COMPILER ", C standard " STEELCHECK_STR(__STDC_VERSION__);
+  return STEELCHECK_COMPILER ", C standard " STEELCHECK_STR ( __STDC_VERSION__ );
 }

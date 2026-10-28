@@ -80,7 +80,7 @@ static bool diagnostic_is_ ( const Collector* collector, size_t i, SteelCheckSev
   if ( !ok )
   {
     fprintf ( stderr, "    diagnostic %zu: %s at %zu:%zu: %s\n", i,
-              steelcheck_severity_name ( d->severity ), d->line, d->column, d->message );
+              steelcheck_severity_name( d->severity ), d->line, d->column, d->message );
   }
 
   return ok;
@@ -104,7 +104,8 @@ static void test_report ()
                       "column '%s' at %zu", "Ix_cm4", (size_t) 13 );
 
   CHECK_SIZE_EQ ( collector.count, 1 );
-  CHECK ( diagnostic_is_ ( &collector, 0, STEELCHECK_SEVERITY_ERROR, 9, 3, "column 'Ix_cm4' at 13" ) );
+  CHECK ( diagnostic_is_( &collector, 0, STEELCHECK_SEVERITY_ERROR, 9, 3,
+                          "column 'Ix_cm4' at 13" ) );
   CHECK_INT_EQ ( collector.items[0].status, STEELCHECK_ERROR_HEADER );
 
   // A long message is truncated, and still '\0'-terminated.
@@ -114,7 +115,8 @@ static void test_report ()
   memset ( long_text, 'a', sizeof long_text - 1 );
   long_text[sizeof long_text - 1] = '\0';
 
-  steelcheck_report ( &reporter, STEELCHECK_SEVERITY_WARNING, STEELCHECK_OK, 0, 0, "%s", long_text );
+  steelcheck_report ( &reporter, STEELCHECK_SEVERITY_WARNING, STEELCHECK_OK, 0, 0,
+                      "%s", long_text );
 
   CHECK_SIZE_EQ ( strlen( collector.items[1].message ), steelcheck_diagnostic_message_size - 1 );
 
@@ -125,8 +127,8 @@ static void test_report ()
                       "ignored" );
 
   CHECK_SIZE_EQ ( collector.count, 2 );
-  CHECK_STR_EQ  ( steelcheck_severity_name( STEELCHECK_SEVERITY_WARNING ), "warning" );
-  CHECK_STR_EQ  ( steelcheck_severity_name( STEELCHECK_SEVERITY_ERROR ), "error" );
+  CHECK_STR_EQ ( steelcheck_severity_name( STEELCHECK_SEVERITY_WARNING ), "warning" );
+  CHECK_STR_EQ ( steelcheck_severity_name( STEELCHECK_SEVERITY_ERROR ), "error" );
 }
 
 //==================================================================================================
@@ -140,9 +142,11 @@ static void test_classify ()
   CHECK_INT_EQ ( steelcheck_csv_classify( v_( "#" ), nullptr ),         STEELCHECK_LINE_COMMENT );
   CHECK_INT_EQ ( steelcheck_csv_classify( v_( "  # note" ), nullptr ),  STEELCHECK_LINE_COMMENT );
   CHECK_INT_EQ ( steelcheck_csv_classify( v_( "# key value" ), nullptr ), STEELCHECK_LINE_COMMENT );
-  CHECK_INT_EQ ( steelcheck_csv_classify( v_( "# two words: x" ), nullptr ), STEELCHECK_LINE_COMMENT );
+  CHECK_INT_EQ ( steelcheck_csv_classify( v_( "# two words: x" ), nullptr ),
+                 STEELCHECK_LINE_COMMENT );
   CHECK_INT_EQ ( steelcheck_csv_classify( v_( "# : x" ), nullptr ),     STEELCHECK_LINE_COMMENT );
-  CHECK_INT_EQ ( steelcheck_csv_classify( v_( "designation,family" ), nullptr ), STEELCHECK_LINE_DATA );
+  CHECK_INT_EQ ( steelcheck_csv_classify( v_( "designation,family" ), nullptr ),
+                 STEELCHECK_LINE_DATA );
   CHECK_INT_EQ ( steelcheck_csv_classify( v_( "  W150x13.0,W" ), nullptr ), STEELCHECK_LINE_DATA );
 
   // '#' is special only at the start: inside data it is ordinary data.
@@ -154,7 +158,8 @@ static void test_metadata ()
 {
   SteelCheckMetadata meta = {};
 
-  CHECK_INT_EQ ( steelcheck_csv_classify( v_( "# edition: 08/25" ), &meta ), STEELCHECK_LINE_METADATA );
+  CHECK_INT_EQ ( steelcheck_csv_classify( v_( "# edition: 08/25" ), &meta ),
+                 STEELCHECK_LINE_METADATA );
   CHECK ( steelcheck_view_equals_cstr( meta.key, "edition" ) );
   CHECK ( steelcheck_view_equals_cstr( meta.value, "08/25" ) );
 
@@ -171,7 +176,8 @@ static void test_metadata ()
 
   // For any other kind, metadata is reset to empty views.
 
-  CHECK_INT_EQ ( steelcheck_csv_classify( v_( "# plain comment" ), &meta ), STEELCHECK_LINE_COMMENT );
+  CHECK_INT_EQ ( steelcheck_csv_classify( v_( "# plain comment" ), &meta ),
+                 STEELCHECK_LINE_COMMENT );
   CHECK ( meta.key.data == nullptr && meta.value.data == nullptr );
 }
 
@@ -202,7 +208,7 @@ static bool fields_match_ ( const char* line, size_t count, const char* const ex
     if ( column != i + 1 || !steelcheck_view_equals_cstr( field, expected[i] ) )
     {
       fprintf ( stderr, "    field %zu is \"%.*s\" (column %zu), expected \"%s\"\n", i + 1,
-                steelcheck_view_print_length ( field ), field.data, column, expected[i] );
+                steelcheck_view_print_length( field ), field.data, column, expected[i] );
       return false;
     }
   }
@@ -226,7 +232,8 @@ static void test_fields ()
   CHECK ( fields_match_( "a",       1, (const char* const[]) { "a" } ) );
   CHECK ( fields_match_( "",        1, (const char* const[]) { "" } ) );
   CHECK ( fields_match_( nullptr,   1, (const char* const[]) { "" } ) );
-  CHECK ( fields_match_( "\tW150x13.0 ,\t13.0", 2, (const char* const[]) { "W150x13.0", "13.0" } ) );
+  CHECK ( fields_match_( "\tW150x13.0 ,\t13.0", 2,
+                         (const char* const[]) { "W150x13.0", "13.0" } ) );
 
   // Quotes are not interpreted by the iterator: they are reported by the header and row
   // functions. Here a quoted field is simply split at its comma.
@@ -279,8 +286,8 @@ static void test_header_ok ()
 
   // Any order, and a missing optional column: no diagnostics.
 
-  CHECK_INT_EQ ( steelcheck_csv_map_header ( &header, specs_, spec_count_,
-                                             v_ ( " bf_mm , designation,d_mm" ), 9, &reporter ),
+  CHECK_INT_EQ ( steelcheck_csv_map_header( &header, specs_, spec_count_,
+                                            v_( " bf_mm , designation,d_mm" ), 9, &reporter ),
                  STEELCHECK_OK );
 
   CHECK_SIZE_EQ ( collector.count, 0 );
@@ -303,11 +310,12 @@ static void test_header_unknown_column ()
   // An unknown column is a warning only: the header is still valid, and the column is ignored.
 
   CHECK_INT_EQ ( steelcheck_csv_map_header( &header, specs_, spec_count_,
-                                             v_( "designation,color,d_mm,bf_mm" ), 9, &reporter ),
+                                            v_( "designation,color,d_mm,bf_mm" ), 9, &reporter ),
                  STEELCHECK_OK );
 
   CHECK_SIZE_EQ ( collector.count, 1 );
-  CHECK ( diagnostic_is_( &collector, 0, STEELCHECK_SEVERITY_WARNING, 9, 2, "unknown column 'color'" ) );
+  CHECK ( diagnostic_is_( &collector, 0, STEELCHECK_SEVERITY_WARNING, 9, 2,
+                          "unknown column 'color'" ) );
   CHECK_SIZE_EQ ( header.spec_of_column[1], steelcheck_csv_none );
 }
 
@@ -320,21 +328,27 @@ static void test_header_all_problems_reported ()
   // Column 2 is empty, column 3 duplicates column 1, column 4 has a quote, column 5 has the wrong
   // case (unknown), and d_mm and bf_mm are missing: every problem is reported.
 
-  CHECK_INT_EQ ( steelcheck_csv_map_header ( &header, specs_, spec_count_,
-                                             v_( "designation,,designation,\"rt_cm\",D_MM" ), 4,
-                                             &reporter ),
+  CHECK_INT_EQ ( steelcheck_csv_map_header( &header, specs_, spec_count_,
+                                            v_( "designation,,designation,\"rt_cm\",D_MM" ), 4,
+                                            &reporter ),
                  STEELCHECK_ERROR_HEADER );
 
   CHECK_SIZE_EQ ( collector.count, 6 );
   CHECK_SIZE_EQ ( collector.errors, 5 );
   CHECK_SIZE_EQ ( collector.warnings, 1 );
 
-  CHECK ( diagnostic_is_( &collector, 0, STEELCHECK_SEVERITY_ERROR,   4, 2, "empty column name" ) );
-  CHECK ( diagnostic_is_( &collector, 1, STEELCHECK_SEVERITY_ERROR,   4, 3, "duplicate column 'designation' (also column 1)" ) );
-  CHECK ( diagnostic_is_( &collector, 2, STEELCHECK_SEVERITY_ERROR,   4, 4, "quotes" ) );
-  CHECK ( diagnostic_is_( &collector, 3, STEELCHECK_SEVERITY_WARNING, 4, 5, "unknown column 'D_MM'" ) );
-  CHECK ( diagnostic_is_( &collector, 4, STEELCHECK_SEVERITY_ERROR,   4, 0, "missing required column 'd_mm'" ) );
-  CHECK ( diagnostic_is_( &collector, 5, STEELCHECK_SEVERITY_ERROR,   4, 0, "missing required column 'bf_mm'" ) );
+  CHECK ( diagnostic_is_( &collector, 0, STEELCHECK_SEVERITY_ERROR,   4, 2,
+                          "empty column name" ) );
+  CHECK ( diagnostic_is_( &collector, 1, STEELCHECK_SEVERITY_ERROR,   4, 3,
+                          "duplicate column 'designation' (also column 1)" ) );
+  CHECK ( diagnostic_is_( &collector, 2, STEELCHECK_SEVERITY_ERROR,   4, 4,
+                          "quotes" ) );
+  CHECK ( diagnostic_is_( &collector, 3, STEELCHECK_SEVERITY_WARNING, 4, 5,
+                          "unknown column 'D_MM'" ) );
+  CHECK ( diagnostic_is_( &collector, 4, STEELCHECK_SEVERITY_ERROR,   4, 0,
+                          "missing required column 'd_mm'" ) );
+  CHECK ( diagnostic_is_( &collector, 5, STEELCHECK_SEVERITY_ERROR,   4, 0,
+                          "missing required column 'bf_mm'" ) );
 }
 
 static void test_header_too_many_columns ()
@@ -354,7 +368,8 @@ static void test_header_too_many_columns ()
     strcat ( line, extra );
   }
 
-  CHECK_INT_EQ ( steelcheck_csv_map_header( &header, specs_, spec_count_, v_( line ), 1, &reporter ),
+  CHECK_INT_EQ ( steelcheck_csv_map_header( &header, specs_, spec_count_,
+                                            v_( line ), 1, &reporter ),
                  STEELCHECK_ERROR_HEADER );
 
   // The warnings for the 61 unknown columns that fit come first; the last diagnostic is the error.
@@ -376,8 +391,8 @@ static void test_header_invalid_arguments ()
 
   // Without a reporter, problems are not reported, but the result is the same.
 
-  CHECK_INT_EQ ( steelcheck_csv_map_header ( &header, specs_, spec_count_, v_( "designation" ), 1,
-                                             nullptr ),
+  CHECK_INT_EQ ( steelcheck_csv_map_header( &header, specs_, spec_count_, v_( "designation" ), 1,
+                                            nullptr ),
                  STEELCHECK_ERROR_HEADER );
 }
 
@@ -392,15 +407,15 @@ static void test_rows ()
   SteelCheckCsvHeader header    = {};
   SteelCheckView      fields[spec_count_];
 
-  CHECK_INT_EQ ( steelcheck_csv_map_header ( &header, specs_, spec_count_,
-                                             v_( "bf_mm,color,designation,d_mm" ), 1, &reporter ),
+  CHECK_INT_EQ ( steelcheck_csv_map_header( &header, specs_, spec_count_,
+                                            v_( "bf_mm,color,designation,d_mm" ), 1, &reporter ),
                  STEELCHECK_OK );
 
   // Fields arrive by spec: the unknown column (color) is skipped, and rt_cm, which the file does
   // not have, is an empty view.
 
   CHECK_INT_EQ ( steelcheck_csv_split_row( &header, v_( "100, red ,W150x13.0,148" ), 2, fields,
-                                            spec_count_, &reporter ),
+                                           spec_count_, &reporter ),
                  STEELCHECK_OK );
 
   CHECK ( steelcheck_view_equals_cstr( fields[spec_designation_], "W150x13.0" ) );
@@ -408,10 +423,10 @@ static void test_rows ()
   CHECK ( steelcheck_view_equals_cstr( fields[spec_bf_],          "100" ) );
   CHECK ( steelcheck_view_is_empty( fields[spec_rt_] ) );
 
-  // An empty field is allowed here (whether a value is required is checked later).
+  // An empty field is allowed here (whether a value is required is checked later, in step 5).
 
   CHECK_INT_EQ ( steelcheck_csv_split_row( &header, v_( "100,,W150x13.0," ), 3, fields,
-                                            spec_count_, &reporter ),
+                                           spec_count_, &reporter ),
                  STEELCHECK_OK );
   CHECK ( steelcheck_view_is_empty( fields[spec_d_] ) );
 
@@ -428,24 +443,24 @@ static void test_rows_errors ()
   SteelCheckView      fields[spec_count_];
 
   CHECK_INT_EQ ( steelcheck_csv_map_header( &header, specs_, spec_count_,
-                                             v_( "designation,d_mm,bf_mm" ), 9, &reporter ),
+                                            v_( "designation,d_mm,bf_mm" ), 9, &reporter ),
                  STEELCHECK_OK );
 
   CHECK_INT_EQ ( steelcheck_csv_split_row( &header, v_( "W150x13.0,148" ), 10, fields,
-                                            spec_count_, &reporter ),
+                                           spec_count_, &reporter ),
                  STEELCHECK_ERROR_SYNTAX );
   CHECK ( diagnostic_is_( &collector, 0, STEELCHECK_SEVERITY_ERROR, 10, 0,
-                           "2 fields, but the header (line 9) has 3 columns" ) );
+                          "2 fields, but the header (line 9) has 3 columns" ) );
 
   CHECK_INT_EQ ( steelcheck_csv_split_row( &header, v_( "W150x13.0,148,100,7" ), 11, fields,
-                                            spec_count_, &reporter ),
+                                           spec_count_, &reporter ),
                  STEELCHECK_ERROR_SYNTAX );
   CHECK ( diagnostic_is_( &collector, 1, STEELCHECK_SEVERITY_ERROR, 11, 0, "4 fields" ) );
 
   // A quote is reported at its column, and a rejected row leaves no half-filled fields.
 
   CHECK_INT_EQ ( steelcheck_csv_split_row( &header, v_( "W150x13.0,\"148\",100" ), 12, fields,
-                                            spec_count_, &reporter ),
+                                           spec_count_, &reporter ),
                  STEELCHECK_ERROR_SYNTAX );
   CHECK ( diagnostic_is_( &collector, 2, STEELCHECK_SEVERITY_ERROR, 12, 2, "quotes" ) );
   CHECK ( steelcheck_view_is_empty( fields[spec_designation_] ) );
@@ -454,8 +469,9 @@ static void test_rows_errors ()
 
   static constexpr char with_nul[] = "W150x13.0,1\0" "48,100";
 
-  CHECK_INT_EQ ( steelcheck_csv_split_row ( &header, (SteelCheckView) { sizeof with_nul - 1, with_nul },
-                                            13, fields, spec_count_, &reporter ),
+  CHECK_INT_EQ ( steelcheck_csv_split_row( &header,
+                                           (SteelCheckView) { sizeof with_nul - 1, with_nul },
+                                           13, fields, spec_count_, &reporter ),
                  STEELCHECK_ERROR_SYNTAX );
   CHECK ( diagnostic_is_( &collector, 3, STEELCHECK_SEVERITY_ERROR, 13, 2, "'\\0' byte" ) );
 
@@ -470,7 +486,8 @@ static void test_rows_errors ()
 //==================================================================================================
 
 /*
- *  Every column of the catalog, plus r_mm, which the catalog does not have (optional). 
+ *  Every column of the catalog, plus r_mm, which the catalog does not have (optional). In step 5
+ *  this table moves to the section module.
  */
 
 static const SteelCheckColumnSpec gerdau_specs_[] =

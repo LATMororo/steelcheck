@@ -140,7 +140,7 @@ SteelCheckStatus steelcheck_parse_double ( SteelCheckView text, double* value )
   // Both cannot happen after the format check, but they are cheap to verify: strtod() must have
   // used every character, and the format excludes "inf" and "nan".
 
-  if ( end != copy + text.length || !isfinite ( result ) )
+  if ( end != copy + text.length || !isfinite( result ) )
   {
     return STEELCHECK_ERROR_NUMBER;
   }

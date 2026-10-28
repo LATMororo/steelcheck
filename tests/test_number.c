@@ -87,7 +87,7 @@ static void test_parse_view_bounds ()
   SteelCheckView part  = { .length = 2, .data = "123" };
 
   CHECK_INT_EQ ( steelcheck_parse_double( part, &value ), STEELCHECK_OK );
-  CHECK_NEAR   ( value, 12.0, 0.0 );
+  CHECK_NEAR ( value, 12.0, 0.0 );
 
   // A field in the middle of a line, as the CSV layer produces it.
 
@@ -96,7 +96,7 @@ static void test_parse_view_bounds ()
   SteelCheckView field = { .length = 4, .data = &row[10] };   // "13.0"
 
   CHECK_INT_EQ ( steelcheck_parse_double( field, &value ), STEELCHECK_OK );
-  CHECK_NEAR   ( value, 13.0, 0.0 );
+  CHECK_NEAR ( value, 13.0, 0.0 );
 }
 
 //==================================================================================================
@@ -193,7 +193,8 @@ static void test_parse_flag ()
 
 /*
  *  Catalog columns (1-based): 1 designation and 2 family are text, 3 h_shape and 4 on_request are
- *  flags, 5 to 26 are numbers, 27 designation_imperial is text. The field iterator is enough here.
+ *  flags, 5 to 26 are numbers, 27 designation_imperial is text. The field iterator is enough here;
+ *  mapping by column name is what step 5 will do.
  */
 
 static void test_gerdau_numbers ()
@@ -256,8 +257,8 @@ static void test_gerdau_numbers ()
       if ( status != STEELCHECK_OK )
       {
         fprintf ( stderr, "    line %zu, column %zu: \"%.*s\": %s\n", line_number, column,
-                  steelcheck_view_print_length ( field ), field.data,
-                  steelcheck_status_message ( status ) );
+                  steelcheck_view_print_length( field ), field.data,
+                  steelcheck_status_message( status ) );
         failures++;
       }
     }

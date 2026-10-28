@@ -21,8 +21,8 @@ static void test_near_tolerances ()
 
 static void test_str_eq_null ()
 {
-  CHECK (  test_str_eq( nullptr, nullptr         ) );
-  CHECK ( !test_str_eq( "W150x13.0", nullptr     ) );
+  CHECK (  test_str_eq( nullptr, nullptr ) );
+  CHECK ( !test_str_eq( "W150x13.0", nullptr ) );
   CHECK (  test_str_eq( "W150x13.0", "W150x13.0" ) );
 }
 
@@ -33,5 +33,5 @@ static void test_str_eq_null ()
 void test_framework_suite ()
 {
   RUN_TEST ( test_near_tolerances );
-  RUN_TEST ( test_str_eq_null     );
+  RUN_TEST ( test_str_eq_null );
 }

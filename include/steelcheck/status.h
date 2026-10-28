@@ -1,6 +1,6 @@
 #ifndef STEELCHECK_STATUS_H
 #define STEELCHECK_STATUS_H
- 
+
 #include "steelcheck/compat.h"
 
 /*
@@ -21,6 +21,7 @@ enum SteelCheckStatus : int
   STEELCHECK_ERROR_MISSING_VALUE    = 9,  // an empty field where a value was expected
   STEELCHECK_ERROR_NUMBER           = 10, // a field that is not a valid number
   STEELCHECK_ERROR_RANGE            = 11, // a number too large or too small for a double
+  STEELCHECK_ERROR_VALUE            = 12, // a well-formed but not allowed value, e.g. family "X"
 };
 
 typedef enum SteelCheckStatus SteelCheckStatus;

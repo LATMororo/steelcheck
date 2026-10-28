@@ -44,7 +44,10 @@ const char* steelcheck_status_message ( SteelCheckStatus status )
       return "invalid number";
 
     case STEELCHECK_ERROR_RANGE:
-      return "number of out of range";
+      return "number out of range";
+
+    case STEELCHECK_ERROR_VALUE:
+      return "invalid value";
   }
 
   return "unknown status";

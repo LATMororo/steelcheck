@@ -23,7 +23,7 @@
  *  units ("12mm" would become 12), digit separators ("1_000", "1'000").
  *
  *  Not detectable: a thousands separator written as '.', e.g. "4.181" meaning 4181. It is a
- *  valid decimal number.
+ *  valid decimal number; the consistency checks of the section module (step 6) catch such values.
  *
  *  The program never calls setlocale(), so strtod() always uses the "C" locale, where the decimal
  *  separator is '.', also on computers set to Portuguese.

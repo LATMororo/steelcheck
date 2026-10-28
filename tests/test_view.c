@@ -35,19 +35,19 @@ static void test_view_from_cstr ()
 
 static void test_view_trim ()
 {
-  CHECK ( steelcheck_view_equals_cstr ( steelcheck_view_trim( v_( "  Ix_cm4  " ) ), "Ix_cm4" ) );
-  CHECK ( steelcheck_view_equals_cstr ( steelcheck_view_trim( v_( "\t a b \t" ) ), "a b" ) );
-  CHECK ( steelcheck_view_equals_cstr ( steelcheck_view_trim( v_( "abc" ) ), "abc" ) );
-  CHECK ( steelcheck_view_equals_cstr ( steelcheck_view_trim( v_( "   " ) ), "" ) );
-  CHECK ( steelcheck_view_equals_cstr ( steelcheck_view_trim( v_( "" ) ), "" ) );
+  CHECK ( steelcheck_view_equals_cstr( steelcheck_view_trim( v_( "  Ix_cm4  " ) ), "Ix_cm4" ) );
+  CHECK ( steelcheck_view_equals_cstr( steelcheck_view_trim( v_( "\t a b \t" ) ), "a b" ) );
+  CHECK ( steelcheck_view_equals_cstr( steelcheck_view_trim( v_( "abc" ) ), "abc" ) );
+  CHECK ( steelcheck_view_equals_cstr( steelcheck_view_trim( v_( "   " ) ), "" ) );
+  CHECK ( steelcheck_view_equals_cstr( steelcheck_view_trim( v_( "" ) ), "" ) );
 
   // Only spaces and tabs are blanks: '\r' is kept (the line iterator already removed CRLF).
 
-  CHECK ( steelcheck_view_equals_cstr ( steelcheck_view_trim( v_( " a\r" ) ), "a\r" ) );
+  CHECK ( steelcheck_view_equals_cstr( steelcheck_view_trim( v_( " a\r" ) ), "a\r" ) );
 
   // UTF-8 bytes (>= 0x80) are ordinary data, also at the ends.
 
-  CHECK ( steelcheck_view_equals_cstr ( steelcheck_view_trim( v_( " ção " ) ), "ção" ) );
+  CHECK ( steelcheck_view_equals_cstr( steelcheck_view_trim( v_( " ção " ) ), "ção" ) );
 
   // An empty view without data is returned unchanged.
 
@@ -108,4 +108,3 @@ void test_view_suite ()
   RUN_TEST ( test_view_starts_with );
   RUN_TEST ( test_view_print_length );
 }
-

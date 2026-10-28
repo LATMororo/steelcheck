@@ -42,4 +42,4 @@
 #  define STEELCHECK_PRINTF(format_index, first_arg_index)
 #endif
 
-#endif // STEELCHECK_COMPAT_H
+#endif /* STEELCHECK_COMPAT_H */

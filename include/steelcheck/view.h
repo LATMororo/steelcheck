@@ -1,6 +1,8 @@
 #ifndef STEELCHECK_VIEW_H
 #define STEELCHECK_VIEW_H
 
+#include "steelcheck/compat.h"
+
 #include <stddef.h>
 
 /*
@@ -15,7 +17,7 @@
 typedef struct SteelCheckView
 {
   size_t      length;  // bytes visible through the view
-  const char* data;    // borrowed, read-only memory; not necessarily '\0'-terminated
+  const char* data;    // borrowed, read-only memory; nullptr for an empty view with no data
 } SteelCheckView;
 
 /*

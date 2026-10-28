@@ -19,6 +19,12 @@ static void test_status_messages ()
     STEELCHECK_ERROR_NO_MEMORY,
     STEELCHECK_ERROR_OVERFLOW,
     STEELCHECK_ERROR_INVALID_ARGUMENT,
+    STEELCHECK_ERROR_SYNTAX,
+    STEELCHECK_ERROR_HEADER,
+    STEELCHECK_ERROR_MISSING_VALUE,
+    STEELCHECK_ERROR_NUMBER,
+    STEELCHECK_ERROR_RANGE,
+    STEELCHECK_ERROR_VALUE,
   };
 
   for ( size_t i = 0; i < sizeof codes / sizeof codes[0]; i++ )
@@ -26,17 +32,17 @@ static void test_status_messages ()
     const char* message = steelcheck_status_message ( codes[i] );
 
     CHECK ( message != nullptr && message[0] != '\0' );
-    CHECK ( strcmp ( message, "unknown status" ) != 0 );
+    CHECK ( strcmp( message, "unknown status" ) != 0 );
   }
 
-  CHECK_STR_EQ ( steelcheck_status_message ( STEELCHECK_ERROR_OPEN ), "cannot open file" );
+  CHECK_STR_EQ ( steelcheck_status_message( STEELCHECK_ERROR_OPEN ), "cannot open file" );
 }
 
 static void test_status_unknown ()
 {
   // A fixed underlying type allows any int to be stored, not only the listed codes.
 
-  CHECK_STR_EQ ( steelcheck_status_message ( (SteelCheckStatus) 999 ), "unknown status" );
+  CHECK_STR_EQ ( steelcheck_status_message( (SteelCheckStatus) 999 ), "unknown status" );
 }
 
 //==================================================================================================
