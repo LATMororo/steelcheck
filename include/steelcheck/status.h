@@ -22,6 +22,7 @@ enum SteelCheckStatus : int
   STEELCHECK_ERROR_NUMBER           = 10, // a field that is not a valid number
   STEELCHECK_ERROR_RANGE            = 11, // a number too large or too small for a double
   STEELCHECK_ERROR_VALUE            = 12, // a well-formed but not allowed value, e.g. family "X"
+  STEELCHECK_ERROR_INCONSISTENT     = 13, // values that disagree, e.g. Wx far from 2 Ix / d
 };
 
 typedef enum SteelCheckStatus SteelCheckStatus;

@@ -25,6 +25,7 @@ static void test_status_messages ()
     STEELCHECK_ERROR_NUMBER,
     STEELCHECK_ERROR_RANGE,
     STEELCHECK_ERROR_VALUE,
+    STEELCHECK_ERROR_INCONSISTENT,
   };
 
   for ( size_t i = 0; i < sizeof codes / sizeof codes[0]; i++ )

@@ -101,7 +101,7 @@ typedef struct SteelCheckSection
   double tf;    // flange thickness
   double h;     // clear distance between flanges, d - 2 tf
   double dp;    // d': flat part of the web, without the fillets
-  double r;     // fillet radius (not in the Gerdau catalog)
+  double r;     // fillet radius; computed as (h - d') / 2 when not given (see validate)
 
   // Properties.
 
@@ -119,16 +119,35 @@ typedef struct SteelCheckSection
   double Cw;    // warping constant [mm^6]
   double u;     // surface area per length [m^2/m]
 
-  // Slenderness ratios as printed in the catalog [-].
+  // Slenderness ratios [-]. Read from the catalog, then replaced by steelcheck_section_validate
+  // with the values computed from the dimensions (the printed ones are rounded); the printed
+  // values are only compared with the computed ones.
 
   double lambda_f;  // bf / (2 tf)
   double lambda_w;  // d' / tw
 
+  // Derived by steelcheck_section_validate (no CSV column).
+
+  double h0;    // distance between the flange centroids, d - tf [mm]
+  double r0;    // polar radius of gyration about the shear centre, sqrt(rx^2 + ry^2) [mm]
+
   // Bookkeeping.
 
   uint32_t present;      // bit f set: field f was given in the file (see steelcheck_section_has)
+  uint32_t computed;     // bit f set: field f was computed by the program (r, lambda_f, lambda_w)
   size_t   source_line;  // line of the CSV file the section was read from
 } SteelCheckSection;
+
+/*
+ *  Relative tolerances of the consistency checks of steelcheck_section_validate. Catalog values
+ *  are rounded, so they never match the computed ones exactly. In the Gerdau catalog the largest
+ *  differences are 0.5 % for exact relations, 0.9 % for Cw and 2.9 % for the mass.
+ */
+
+constexpr double steelcheck_tolerance_exact  = 0.01;  // h, A, Wx, Wy, rx, ry, lambda_f, lambda_w
+constexpr double steelcheck_tolerance_approx = 0.03;  // Cw ~ Iy h0^2 / 4 (the fillets are ignored)
+constexpr double steelcheck_tolerance_mass   = 0.05;  // mass ~ A x 7850 kg/m^3 (nominal masses)
+constexpr double steelcheck_tolerance_name   = 0.005; // mass in the designation vs mass_kg_m
 
 //==================================================================================================
 //  Functions
@@ -148,6 +167,14 @@ typedef struct SteelCheckSection
 
 [[nodiscard]] bool steelcheck_section_has ( const SteelCheckSection* section,
                                             SteelCheckField field );
+
+/*
+ *  True if field was computed by steelcheck_section_validate instead of read (r, lambda_f,
+ *  lambda_w).
+ */
+
+[[nodiscard]] bool steelcheck_section_was_computed ( const SteelCheckSection* section,
+                                                     SteelCheckField field );
 
 /*
  *  "W" and "HP"
@@ -174,6 +201,33 @@ typedef struct SteelCheckSection
                                                              const SteelCheckCsvHeader* header,
                                                              const SteelCheckView* fields,
                                                              size_t line_number,
+                                                             const SteelCheckReporter* reporter );
+
+/*
+ *  Checks a section built by steelcheck_section_from_row, and completes it.
+ *
+ *  1. Errors (the section cannot be used), all reported:
+ *       - a value that is not positive;
+ *       - impossible geometry: 2 tf >= d, tw >= bf, h >= d, d' > h;
+ *       - Zx < Wx, Zy < Wy (plastic modulus below the elastic one), Iy > Ix (axes swapped?);
+ *       - a designation that does not match the family (W... for W, HP... for HP).
+ *  2. Only if there is no error, derived values: r = (h - d') / 2 if r was not given, h0, r0,
+ *     lambda_f = bf / (2 tf), lambda_w = d' / tw.
+ *  3. Warnings (the section is used anyway), for catalog values that differ from what the other
+ *     values imply by more than the tolerances above: h, A, mass, Wx, Wy, rx, ry, Cw and the
+ *     printed lambda_f and lambda_w; and the mass in the designation (e.g. 153.0 in W610x153.0)
+ *     against mass_kg_m.
+ *
+ *  Messages start with the designation and name the catalog column, with values in the catalog's
+ *  units, e.g. "W150x13.0: Wx_cm3 94.4 differs from 2 Ix / d = 85.81 (+10.0 %)". They carry the
+ *  section's source line; the column is 0 (several columns are involved).
+ *
+ *  Returns STEELCHECK_OK if there was no error (warnings are allowed), STEELCHECK_ERROR_VALUE
+ *  otherwise (the section is then left unchanged), or STEELCHECK_ERROR_INVALID_ARGUMENT for
+ *  nullptr.
+ */
+
+[[nodiscard]] SteelCheckStatus steelcheck_section_validate ( SteelCheckSection* section,
                                                              const SteelCheckReporter* reporter );
 
 #endif // STEELCHECK_SECTION_H

@@ -48,6 +48,9 @@ const char* steelcheck_status_message ( SteelCheckStatus status )
 
     case STEELCHECK_ERROR_VALUE:
       return "invalid value";
+
+    case STEELCHECK_ERROR_INCONSISTENT:
+      return "inconsistent values";
   }
 
   return "unknown status";
