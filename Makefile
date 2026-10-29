@@ -32,8 +32,8 @@ CSTD := -std=c23
 
 WARNINGS := -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion \
             -Wdouble-promotion -Wformat=2 -Wstrict-prototypes -Wmissing-prototypes \
-			-Wmissing-declarations -Wformat-security -Wnull-dereference -Wcast-qual \
-			-Wundef -Wvla
+            -Wmissing-declarations -Wformat-security -Wnull-dereference -Wcast-qual \
+            -Wundef -Wvla
 
 ifeq ($(WERROR),1)
   WARNINGS += -Werror
@@ -54,7 +54,7 @@ else
 endif
 
 # -MMD -MP write a .d file next to each object, listing the headers it includes.
-ALL_CPPFLAGS := -Iinclude -MMD -MP $(CPPFLAGS)
+ALL_CPPFLAGS := -Iinclude -Isrc -MMD -MP $(CPPFLAGS)
 ALL_CFLAGS   := $(CSTD) $(WARNINGS) $(OPTFLAGS) $(CFLAGS)
 ALL_LDFLAGS  := $(SANFLAGS) $(LDFLAGS)
 LDLIBS       := -lm
@@ -66,15 +66,19 @@ LDLIBS       := -lm
 BUILD_DIR := build/$(BUILD)
 
 CORE_SRC := $(wildcard src/core/*.c)
-CLI_SRC  := $(wildcard src/cli/*.c)
+# The CLI's main() is kept apart: the rest of the CLI goes into a library that the tests link too.
+CLI_MAIN := src/cli/main.c
+CLI_SRC  := $(filter-out $(CLI_MAIN), $(wildcard src/cli/*.c))
 TEST_SRC := $(wildcard tests/*.c)
 
 CORE_OBJ := $(CORE_SRC:%.c=$(BUILD_DIR)/%.o)
 CLI_OBJ  := $(CLI_SRC:%.c=$(BUILD_DIR)/%.o)
+MAIN_OBJ := $(CLI_MAIN:%.c=$(BUILD_DIR)/%.o)
 TEST_OBJ := $(TEST_SRC:%.c=$(BUILD_DIR)/%.o)
-DEPS     := $(CORE_OBJ:.o=.d) $(CLI_OBJ:.o=.d) $(TEST_OBJ:.o=.d)
+DEPS     := $(CORE_OBJ:.o=.d) $(CLI_OBJ:.o=.d) $(MAIN_OBJ:.o=.d) $(TEST_OBJ:.o=.d)
 
 LIB         := $(BUILD_DIR)/libsteelcheck.a
+CLI_LIB     := $(BUILD_DIR)/libsteelcheck_cli.a
 CLI         := $(BUILD_DIR)/steelcheck$(EXE)
 TEST_RUNNER := $(BUILD_DIR)/test_runner$(EXE)
 
@@ -97,12 +101,21 @@ $(LIB): $(CORE_OBJ)
 	@rm -f $@
 	$(AR) rcs $@ $^
 
-# Link order matters: objects first, then the library they use, then -lm.
-$(CLI): $(CLI_OBJ) $(LIB)
+$(CLI_LIB): $(CLI_OBJ)
+	@rm -f $@
+	$(AR) rcs $@ $^
+
+# Link order matters: objects first, then the libraries they use (the CLI library uses the core
+# library, so it comes first), then -lm.
+$(CLI): $(MAIN_OBJ) $(CLI_LIB) $(LIB)
 	$(CC) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(TEST_RUNNER): $(TEST_OBJ) $(LIB)
+$(TEST_RUNNER): $(TEST_OBJ) $(CLI_LIB) $(LIB)
 	$(CC) $(ALL_LDFLAGS) $^ $(LDLIBS) -o $@
+
+# builtin.c embeds the catalog with #embed. Compilers that record embedded files in the -MMD
+# dependency files (Clang does) rebuild it anyway when the CSV changes; this line makes sure all do.
+$(BUILD_DIR)/src/core/builtin.o: data/gerdau_w_hp.csv
 
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(@D)

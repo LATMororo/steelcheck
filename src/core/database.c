@@ -1,6 +1,7 @@
 #include "steelcheck/database.h"
 
 #include "steelcheck/buffer.h"
+#include "steelcheck/builtin.h"
 #include "steelcheck/csv.h"
 #include "steelcheck/lines.h"
 
@@ -332,7 +333,7 @@ SteelCheckStatus steelcheck_database_load_file ( SteelCheckDatabase* db, const c
 
   if ( status != STEELCHECK_OK )
   {
-    steelcheck_report ( reporter, STEELCHECK_SEVERITY_ERROR, status, 0, 0, "%s: %s", path,
+    steelcheck_report ( reporter, STEELCHECK_SEVERITY_ERROR, status, 0, 0, "%s",
                         steelcheck_status_message( status ) );
     return status;
   }
@@ -344,6 +345,21 @@ SteelCheckStatus steelcheck_database_load_file ( SteelCheckDatabase* db, const c
   steelcheck_buffer_free ( &buff );
 
   return status;
+}
+
+//==================================================================================================
+//  steelcheck_database_load_builtin
+//==================================================================================================
+
+SteelCheckStatus steelcheck_database_load_builtin ( SteelCheckDatabase* db,
+                                                    const SteelCheckReporter* reporter )
+{
+  if ( !steelcheck_builtin_available() )
+  {
+    return STEELCHECK_ERROR_UNAVAILABLE;
+  }
+
+  return steelcheck_database_load ( db, steelcheck_builtin_text(), reporter );
 }
 
 //==================================================================================================

@@ -70,12 +70,21 @@ typedef struct SteelCheckDatabase
 
 /*
  *  Reads the file at path and loads it like steelcheck_database_load. A file that cannot be read
- *  is reported as "<path>: <status message>" and its status is returned.
+ *  is reported with the status message (e.g. "cannot open file") at line 0, and its status is
+ *  returned. Messages do not repeat path: the reporter knows which file it is printing for.
  */
 
 [[nodiscard]] SteelCheckStatus steelcheck_database_load_file ( SteelCheckDatabase* db,
                                                                const char* path,
                                                                const SteelCheckReporter* reporter );
+
+/*
+ *  Loads the built-in database (see builtin.h) like steelcheck_database_load. Returns
+ *  STEELCHECK_ERROR_UNAVAILABLE if this build has none (a compiler without #embed).
+ */
+
+[[nodiscard]] SteelCheckStatus
+steelcheck_database_load_builtin ( SteelCheckDatabase* db, const SteelCheckReporter* reporter );
 
 /*
  *  Frees the sections and leaves db empty. Safe on an empty database, twice, and on nullptr.

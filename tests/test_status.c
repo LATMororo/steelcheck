@@ -27,6 +27,7 @@ static void test_status_messages ()
     STEELCHECK_ERROR_VALUE,
     STEELCHECK_ERROR_INCONSISTENT,
     STEELCHECK_ERROR_DUPLICATE,
+    STEELCHECK_ERROR_UNAVAILABLE,
   };
 
   for ( size_t i = 0; i < sizeof codes / sizeof codes[0]; i++ )
@@ -54,5 +55,5 @@ static void test_status_unknown ()
 void test_status_suite ()
 {
   RUN_TEST ( test_status_messages );
-  RUN_TEST ( test_status_unknown  );
+  RUN_TEST ( test_status_unknown );
 }

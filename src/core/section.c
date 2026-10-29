@@ -126,6 +126,51 @@ static const FieldInfo_ info_[STEELCHECK_FIELD_COUNT] =
 #undef NUMBER_
 
 //==================================================================================================
+//  Presentation of the fields (public, through steelcheck_field_info)
+//==================================================================================================
+
+/*
+ *  F_( IX ) stands for [STEELCHECK_FIELD_IX]: the preprocessor's ## operator pastes the two tokens
+ *  STEELCHECK_FIELD_ and IX into one, STEELCHECK_FIELD_IX. It only shortens this table.
+ */
+
+#define F_(name) [STEELCHECK_FIELD_##name]
+
+static const SteelCheckFieldInfo field_info_[STEELCHECK_FIELD_COUNT] =
+{
+  F_( DESIGNATION )          = { "",       "",      "designation",                        false },
+  F_( FAMILY )               = { "",       "",      "family",                             false },
+  F_( H_SHAPE )              = { "",       "",      "wide-flange H shape",                false },
+  F_( ON_REQUEST )           = { "",       "",      "produced on request",                false },
+  F_( MASS )                 = { "m",      "kg/m",  "linear mass",                        true  },
+  F_( D )                    = { "d",      "mm",    "total depth",                        true  },
+  F_( BF )                   = { "bf",     "mm",    "flange width",                       true  },
+  F_( TW )                   = { "tw",     "mm",    "web thickness",                      true  },
+  F_( TF )                   = { "tf",     "mm",    "flange thickness",                   true  },
+  F_( H )                    = { "h",      "mm",    "clear distance between flanges",     true  },
+  F_( DP )                   = { "d'",     "mm",    "flat web depth",                     true  },
+  F_( R )                    = { "r",      "mm",    "fillet radius",                      true  },
+  F_( A )                    = { "A",      "cm^2",  "gross area",                         true  },
+  F_( IX )                   = { "Ix",     "cm^4",  "second moment of area, x",           true  },
+  F_( WX )                   = { "Wx",     "cm^3",  "elastic section modulus, x",         true  },
+  F_( RX )                   = { "rx",     "cm",    "radius of gyration, x",              true  },
+  F_( ZX )                   = { "Zx",     "cm^3",  "plastic section modulus, x",         true  },
+  F_( IY )                   = { "Iy",     "cm^4",  "second moment of area, y",           true  },
+  F_( WY )                   = { "Wy",     "cm^3",  "elastic section modulus, y",         true  },
+  F_( RY )                   = { "ry",     "cm",    "radius of gyration, y",              true  },
+  F_( ZY )                   = { "Zy",     "cm^3",  "plastic section modulus, y",         true  },
+  F_( RT )                   = { "rt",     "cm",    "radius of gyration, flange + web/3", true  },
+  F_( J )                    = { "J",      "cm^4",  "torsion constant",                   true  },
+  F_( LAMBDA_F )             = { "bf/2tf", "",      "flange slenderness",                 true  },
+  F_( LAMBDA_W )             = { "d'/tw",  "",      "web slenderness",                    true  },
+  F_( CW )                   = { "Cw",     "cm^6",  "warping constant",                   true  },
+  F_( U )                    = { "u",      "m^2/m", "surface area per length",            true  },
+  F_( DESIGNATION_IMPERIAL ) = { "",       "",      "imperial designation",               false },
+};
+
+#undef F_
+
+//==================================================================================================
 //  Private helpers
 //==================================================================================================
 
@@ -138,6 +183,15 @@ static const FieldInfo_ info_[STEELCHECK_FIELD_COUNT] =
 static double* number_slot_ ( SteelCheckSection* section, size_t offset )
 {
   return (double*) ( (unsigned char*) section + offset );
+}
+
+/*
+ *  The value of a numeric field, read through the info_ table (the const twin of number_slot_).
+ */
+
+static double value_ ( const SteelCheckSection* section, SteelCheckField field )
+{
+  return *(const double*) ( (const unsigned char*) section + info_[field].offset );
 }
 
 /*
@@ -265,6 +319,49 @@ static char to_upper_ ( char c )
 const SteelCheckColumnSpec* steelcheck_section_columns ()
 {
   return columns_;
+}
+
+//==================================================================================================
+//  steelcheck_field_info
+//==================================================================================================
+
+const SteelCheckFieldInfo* steelcheck_field_info ( SteelCheckField field )
+{
+  if ( field < 0 || field >= STEELCHECK_FIELD_COUNT )
+  {
+    return nullptr;
+  }
+
+  return &field_info_[field];
+}
+
+//==================================================================================================
+//  steelcheck_section_value
+//==================================================================================================
+
+double steelcheck_section_value ( const SteelCheckSection* section, SteelCheckField field )
+{
+  if ( section == nullptr || field < 0 || field >= STEELCHECK_FIELD_COUNT )
+  {
+    return 0.0;
+  }
+
+  switch ( info_[field].kind )
+  {
+    case KIND_NUMBER_:
+      return value_( section, field ) / info_[field].scale;
+
+    case KIND_FLAG_:
+    {
+      bool flag = field == STEELCHECK_FIELD_H_SHAPE ? section->h_shape : section->on_request;
+      return flag ? 1.0 : 0.0;
+    }
+
+    case KIND_TEXT_:
+      return 0.0;
+  }
+
+  return 0.0;
 }
 
 //==================================================================================================
@@ -523,15 +620,6 @@ static void finding_ ( CheckContext_* ctx, SteelCheckSeverity severity, const ch
 
   steelcheck_report ( ctx->reporter, severity, status, ctx->section->source_line, 0, "%s: %s",
                       ctx->section->designation, detail );
-}
-
-/*
- *  The value of a numeric field, read through the info_ table (the const twin of number_slot_).
- */
-
-static double value_ ( const SteelCheckSection* section, SteelCheckField field )
-{
-  return *(const double*) ( (const unsigned char*) section + info_[field].offset );
 }
 
 /*

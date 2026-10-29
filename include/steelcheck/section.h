@@ -162,6 +162,34 @@ constexpr double steelcheck_tolerance_name   = 0.005; // mass in the designation
 [[nodiscard]] const SteelCheckColumnSpec* steelcheck_section_columns ();
 
 /*
+ *  How a field is presented to people: its symbol, the catalog unit of its value (also used by
+ *  steelcheck_section_value), and a short description. Text fields and flags have an empty unit,
+ *  ratios too.
+ */
+
+typedef struct SteelCheckFieldInfo
+{
+  const char* symbol;        // e.g. "Ix", "d'", "bf/2tf"
+  const char* unit;          // e.g. "cm^4", "mm", "" (no unit)
+  const char* description;   // e.g. "second moment of area, x axis"
+  bool        numeric;       // a number (true), or a text or flag field (false)
+} SteelCheckFieldInfo;
+
+/*
+ *  The presentation of field, or nullptr for a value outside SteelCheckField.
+ */
+
+[[nodiscard]] const SteelCheckFieldInfo* steelcheck_field_info ( SteelCheckField field );
+
+/*
+ *  The value of a numeric field in its catalog unit (e.g. Ix in cm^4, not mm^4); 1 or 0 for the
+ *  flags; 0 for text fields and values outside SteelCheckField.
+ */
+
+[[nodiscard]] double steelcheck_section_value ( const SteelCheckSection* section,
+                                                SteelCheckField field );
+
+/*
  *  True if field was given in the file the section was read from.
  */
 
@@ -228,7 +256,8 @@ constexpr size_t steelcheck_designation_key_size = steelcheck_designation_size +
  *       - a value that is not positive;
  *       - impossible geometry: 2 tf >= d, tw >= bf, h >= d, d' > h;
  *       - Zx < Wx, Zy < Wy (plastic modulus below the elastic one), Iy > Ix (axes swapped?);
- *       - a designation that does not match the family (W... for W, HP... for HP).
+ *       - a designation whose key (see steelcheck_designation_key) does not start with the
+ *         family name followed by a digit: "W150x13.0" and "w 150 x 13,0" are valid W designations.
  *  2. Only if there is no error, derived values: r = (h - d') / 2 if r was not given, h0, r0,
  *     lambda_f = bf / (2 tf), lambda_w = d' / tw.
  *  3. Warnings (the section is used anyway), for catalog values that differ from what the other

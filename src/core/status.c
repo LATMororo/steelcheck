@@ -54,6 +54,9 @@ const char* steelcheck_status_message ( SteelCheckStatus status )
 
     case STEELCHECK_ERROR_DUPLICATE:
       return "duplicate designation";
+
+    case STEELCHECK_ERROR_UNAVAILABLE:
+      return "not available in this build";
   }
 
   return "unknown status";

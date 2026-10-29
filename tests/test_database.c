@@ -1,4 +1,6 @@
 #include "steelcheck/compat.h"
+#include "steelcheck/buffer.h"
+#include "steelcheck/builtin.h"
 #include "steelcheck/database.h"
 #include "suites.h"
 #include "test.h"
@@ -335,8 +337,66 @@ static void test_load_file_missing ()
   CHECK_INT_EQ ( steelcheck_database_load_file( &db, "tests/data/does_not_exist.csv", &reporter ),
                  STEELCHECK_ERROR_OPEN );
   CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_ERROR, 0, 0,
-                              "tests/data/does_not_exist.csv: cannot open file" ) );
+                              "cannot open file" ) );
   CHECK_SIZE_EQ ( db.count, 0 );
+}
+
+//==================================================================================================
+//  The built-in database
+//==================================================================================================
+
+static void test_builtin_text ()
+{
+  SteelCheckView text = steelcheck_builtin_text ();
+
+  if ( !steelcheck_builtin_available() )
+  {
+    // A build without #embed (e.g. GCC 14): no text at all.
+
+    CHECK ( text.data == nullptr && text.length == 0 );
+    return;
+  }
+
+  // The embedded bytes are exactly the bytes of the CSV file.
+
+  SteelCheckBuffer buff = {};
+
+  CHECK_INT_EQ ( steelcheck_buffer_load( &buff, "data/gerdau_w_hp.csv" ), STEELCHECK_OK );
+  CHECK_SIZE_EQ ( text.length, buff.size );
+
+  if ( text.length == buff.size && buff.data != nullptr )
+  {
+    CHECK ( memcmp( text.data, buff.data, buff.size ) == 0 );
+  }
+
+  steelcheck_buffer_free ( &buff );
+}
+
+static void test_load_builtin ()
+{
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
+  SteelCheckDatabase db        = {};
+
+  if ( !steelcheck_builtin_available() )
+  {
+    CHECK_INT_EQ ( steelcheck_database_load_builtin( &db, &reporter ),
+                   STEELCHECK_ERROR_UNAVAILABLE );
+    CHECK_SIZE_EQ ( db.count, 0 );
+    return;
+  }
+
+  // The same database as the file: 108 sections and the one W610x153.0 warning.
+
+  CHECK_INT_EQ ( steelcheck_database_load_builtin( &db, &reporter ), STEELCHECK_OK );
+  CHECK_SIZE_EQ ( db.count, 108 );
+  CHECK_SIZE_EQ ( collector.count, 1 );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_WARNING, 113, 0,
+                              "W610x153.0: mass_kg_m 154.2" ) );
+  CHECK_STR_EQ ( steelcheck_database_metadata( &db, "edition" ), "08/25" );
+  CHECK ( steelcheck_database_find( &db, "W 310 x 38,7" ) != nullptr );
+
+  steelcheck_database_free ( &db );
 }
 
 //==================================================================================================
@@ -354,4 +414,6 @@ void test_database_suite ()
   RUN_TEST ( test_load_invalid_arguments );
   RUN_TEST ( test_load_file_gerdau );
   RUN_TEST ( test_load_file_missing );
+  RUN_TEST ( test_builtin_text );
+  RUN_TEST ( test_load_builtin );
 }

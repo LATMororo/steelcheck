@@ -476,6 +476,59 @@ static void test_validate_given_r ()
 }
 
 //==================================================================================================
+//  Presentation of the fields
+//==================================================================================================
+
+static void test_field_info ()
+{
+  // Every field has a presentation with a description; numeric fields are exactly the ones the
+  // CSV reads as numbers (all except the three text fields and the two flags).
+
+  size_t numeric = 0;
+
+  for ( int f = 0; f < STEELCHECK_FIELD_COUNT; f++ )
+  {
+    const SteelCheckFieldInfo* info = steelcheck_field_info ( (SteelCheckField) f );
+
+    CHECK ( info != nullptr && info->symbol != nullptr && info->unit != nullptr );
+    CHECK ( info != nullptr && info->description != nullptr && info->description[0] != '\0' );
+
+    numeric += info != nullptr && info->numeric ? 1 : 0;
+  }
+
+  CHECK_SIZE_EQ ( numeric, STEELCHECK_FIELD_COUNT - 5 );
+
+  CHECK_STR_EQ ( steelcheck_field_info( STEELCHECK_FIELD_IX )->symbol, "Ix" );
+  CHECK_STR_EQ ( steelcheck_field_info( STEELCHECK_FIELD_IX )->unit,   "cm^4" );
+  CHECK_STR_EQ ( steelcheck_field_info( STEELCHECK_FIELD_DP )->symbol, "d'" );
+  CHECK ( steelcheck_field_info( STEELCHECK_FIELD_COUNT ) == nullptr );
+  CHECK ( steelcheck_field_info( (SteelCheckField) -1 ) == nullptr );
+}
+
+static void test_section_value ()
+{
+  // Values in the catalog's units: the conversion of the row, undone.
+
+  SteelCheckSection s = w150_ ();
+
+  CHECK_NEAR ( steelcheck_section_value( &s, STEELCHECK_FIELD_IX ),   635.0, 1e-12 );   // cm^4
+  CHECK_NEAR ( steelcheck_section_value( &s, STEELCHECK_FIELD_A ),    16.6,  1e-12 );   // cm^2
+  CHECK_NEAR ( steelcheck_section_value( &s, STEELCHECK_FIELD_RX ),   6.18,  1e-12 );   // cm
+  CHECK_NEAR ( steelcheck_section_value( &s, STEELCHECK_FIELD_D ),    148.0, 1e-12 );   // mm
+  CHECK_NEAR ( steelcheck_section_value( &s, STEELCHECK_FIELD_MASS ), 13.0,  1e-12 );   // kg/m
+
+  // Flags are 1 or 0, text fields and invalid fields 0.
+
+  s.h_shape = true;
+
+  CHECK_NEAR ( steelcheck_section_value( &s, STEELCHECK_FIELD_H_SHAPE ),     1.0, 0.0 );
+  CHECK_NEAR ( steelcheck_section_value( &s, STEELCHECK_FIELD_ON_REQUEST ),  0.0, 0.0 );
+  CHECK_NEAR ( steelcheck_section_value( &s, STEELCHECK_FIELD_DESIGNATION ), 0.0, 0.0 );
+  CHECK_NEAR ( steelcheck_section_value( &s, STEELCHECK_FIELD_COUNT ),       0.0, 0.0 );
+  CHECK_NEAR ( steelcheck_section_value( nullptr, STEELCHECK_FIELD_IX ),     0.0, 0.0 );
+}
+
+//==================================================================================================
 //  Validation: errors
 //==================================================================================================
 
@@ -719,6 +772,8 @@ void test_section_suite ()
   RUN_TEST ( test_row_invalid_arguments );
   RUN_TEST ( test_gerdau_sections );
   RUN_TEST ( test_designation_key );
+  RUN_TEST ( test_field_info );
+  RUN_TEST ( test_section_value );
   RUN_TEST ( test_validate_derived );
   RUN_TEST ( test_validate_given_r );
   RUN_TEST ( test_validate_errors );
