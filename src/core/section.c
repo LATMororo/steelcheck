@@ -248,6 +248,16 @@ static void read_text_ ( RowContext_* ctx, SteelCheckSection* section, SteelChec
   }
 }
 
+/*
+ *  'a' to 'z' in upper case, every other byte unchanged. Written out instead of toupper() for the
+ *  same reasons as in view.c: no undefined behavior for bytes >= 0x80, no locale.
+ */
+
+static char to_upper_ ( char c )
+{
+  return c >= 'a' && c <= 'z' ? (char) ( c - 'a' + 'A' ) : c;
+}
+
 //==================================================================================================
 //  steelcheck_section_columns
 //==================================================================================================
@@ -301,6 +311,78 @@ const char* steelcheck_family_name ( SteelCheckFamily family )
   }
 
   return "unknown family";
+}
+
+//==================================================================================================
+//  steelcheck_designation_key
+//==================================================================================================
+
+bool steelcheck_designation_key ( const char* designation, char* key, size_t key_size )
+{
+  if ( key == nullptr || key_size == 0 )
+  {
+    return false;
+  }
+
+  key[0] = '\0';
+
+  if ( designation == nullptr )
+  {
+    return false;
+  }
+
+  size_t length = 0;
+  bool   point  = false;
+
+  for ( const char* p = designation; *p != '\0'; p++ )
+  {
+    char c = *p;
+
+    if ( c == ' ' || c == '\t' )
+    {
+      continue;
+    }
+
+    if ( c == ',' )
+    {
+      c = '.';
+    }
+
+    point = point || c == '.';
+
+    // Room for this character and the '\0'.
+
+    if ( length + 1 >= key_size )
+    {
+      key[0] = '\0';
+      return false;
+    }
+
+    key[length++] = to_upper_( c );
+  }
+
+  if ( length == 0 )
+  {
+    return false;
+  }
+
+  // "W360x58" and "W360x58.0" are the same designation.
+
+  if ( !point )
+  {
+    if ( length + 3 > key_size )
+    {
+      key[0] = '\0';
+      return false;
+    }
+
+    key[length++] = '.';
+    key[length++] = '0';
+  }
+
+  key[length] = '\0';
+
+  return true;
 }
 
 //==================================================================================================
@@ -535,19 +617,20 @@ static void check_geometry_ ( CheckContext_* ctx )
 }
 
 /*
- *  The designation must start with the family name followed by a digit: "W150x13.0" for W,
- *  "HP200x53.0" for HP. (A W designation never starts with "HP", and vice versa.)
+ *  The designation's key must start with the family name followed by a digit: "W150x13.0" (and
+ *  "w 150 x 13,0", key "W150X13.0") for W, "HP200x53.0" for HP. Checking the key, not the
+ *  designation as written, keeps validation consistent with lookup and duplicate detection.
  */
 
 static void check_designation_ ( CheckContext_* ctx )
 {
   const SteelCheckSection* s      = ctx->section;
   const char*              family = steelcheck_family_name ( s->family );
-  SteelCheckView           name   = steelcheck_view_from_cstr ( s->designation );
   size_t                   length = strlen ( family );
+  char                     key[steelcheck_designation_key_size];
 
-  bool ok = steelcheck_view_starts_with( name, family ) && name.length > length
-         && name.data[length] >= '0' && name.data[length] <= '9';
+  bool ok = steelcheck_designation_key( s->designation, key, sizeof key )
+         && strncmp( key, family, length ) == 0 && key[length] >= '0' && key[length] <= '9';
 
   if ( !ok )
   {

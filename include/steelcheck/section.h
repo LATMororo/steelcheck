@@ -183,6 +183,24 @@ constexpr double steelcheck_tolerance_name   = 0.005; // mass in the designation
 [[nodiscard]] const char* steelcheck_family_name ( SteelCheckFamily family );
 
 /*
+ *  Writes the comparison key of a designation into key (of key_size bytes): without spaces and
+ *  tabs, letters in upper case, ',' replaced by '.', and ".0" added if there is no '.', e.g.
+ *  "W 150 x 13,0" -> "W150X13.0" and "W360x58" -> "W360X58.0". Two designations are the same
+ *  if their keys are equal. Returns false (key then holds "") if the result is empty or does not
+ *  fit.
+ */
+
+[[nodiscard]] bool steelcheck_designation_key ( const char* designation, char* key,
+                                                size_t key_size );
+
+/*
+ *  Size of a buffer that always holds the key of a designation of a SteelCheckSection: its at
+ *  most 31 characters, ".0", and the '\0'.
+ */
+
+constexpr size_t steelcheck_designation_key_size = steelcheck_designation_size + 2;
+
+/*
  *  Builds a section from one split CSV row.
  *
  *  header must have been mapped with steelcheck_section_columns(), and fields is the row split by

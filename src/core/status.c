@@ -51,6 +51,9 @@ const char* steelcheck_status_message ( SteelCheckStatus status )
 
     case STEELCHECK_ERROR_INCONSISTENT:
       return "inconsistent values";
+
+    case STEELCHECK_ERROR_DUPLICATE:
+      return "duplicate designation";
   }
 
   return "unknown status";

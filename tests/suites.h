@@ -16,5 +16,6 @@ void test_view_suite      ();
 void test_csv_suite       ();
 void test_number_suite    ();
 void test_section_suite   ();
+void test_database_suite  ();
 
 #endif // STEELCHECK_SUITES_H
