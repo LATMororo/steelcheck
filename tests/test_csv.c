@@ -9,83 +9,6 @@
 #include <stdio.h>
 #include <string.h>
 
-//==================================================================================================
-//  Test reporter: collects diagnostics so the tests can check them
-//==================================================================================================
-
-constexpr size_t collector_capacity_ = 16;
-
-typedef struct Collector
-{
-  size_t               count;      // diagnostics received (may exceed the capacity)
-  size_t               errors;
-  size_t               warnings;
-  SteelCheckDiagnostic items[collector_capacity_];
-} Collector;
-
-/*
- *  The reporter callback. context is the Collector, passed through the void* of the reporter.
- *  The diagnostic only lives during the call, so it is copied.
- */
-
-static void collect_ ( void* context, const SteelCheckDiagnostic* diagnostic )
-{
-  Collector* collector = context;
-
-  if ( collector->count < collector_capacity_ )
-  {
-    collector->items[collector->count] = *diagnostic;
-  }
-
-  collector->count++;
-
-  if ( diagnostic->severity == STEELCHECK_SEVERITY_ERROR )
-  {
-    collector->errors++;
-  }
-  else
-  {
-    collector->warnings++;
-  }
-}
-
-/*
- *  A reporter that sends diagnostics to collector.
- */
-
-static SteelCheckReporter reporter_for_ ( Collector* collector )
-{
-  return (SteelCheckReporter) { .report = collect_, .context = collector };
-}
-
-/*
- *  True if diagnostic i exists and has the given severity, line, column, and a message that
- *  contains text. Prints the diagnostic otherwise, to help find the failing case.
- */
-
-static bool diagnostic_is_ ( const Collector* collector, size_t i, SteelCheckSeverity severity,
-                             size_t line, size_t column, const char* text )
-{
-  if ( i >= collector->count || i >= collector_capacity_ )
-  {
-    fprintf ( stderr, "    no diagnostic %zu (only %zu)\n", i, collector->count );
-    return false;
-  }
-
-  const SteelCheckDiagnostic* d = &collector->items[i];
-
-  bool ok = d->severity == severity && d->line == line && d->column == column
-         && strstr ( d->message, text ) != nullptr;
-
-  if ( !ok )
-  {
-    fprintf ( stderr, "    diagnostic %zu: %s at %zu:%zu: %s\n", i,
-              steelcheck_severity_name( d->severity ), d->line, d->column, d->message );
-  }
-
-  return ok;
-}
-
 static SteelCheckView v_ ( const char* string )
 {
   return steelcheck_view_from_cstr ( string );
@@ -97,15 +20,15 @@ static SteelCheckView v_ ( const char* string )
 
 static void test_report ()
 {
-  Collector          collector = {};
-  SteelCheckReporter reporter  = reporter_for_ ( &collector );
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
 
   steelcheck_report ( &reporter, STEELCHECK_SEVERITY_ERROR, STEELCHECK_ERROR_HEADER, 9, 3,
                       "column '%s' at %zu", "Ix_cm4", (size_t) 13 );
 
   CHECK_SIZE_EQ ( collector.count, 1 );
-  CHECK ( diagnostic_is_( &collector, 0, STEELCHECK_SEVERITY_ERROR, 9, 3,
-                          "column 'Ix_cm4' at 13" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_ERROR, 9, 3,
+                              "column 'Ix_cm4' at 13" ) );
   CHECK_INT_EQ ( collector.items[0].status, STEELCHECK_ERROR_HEADER );
 
   // A long message is truncated, and still '\0'-terminated.
@@ -280,8 +203,8 @@ enum { spec_designation_, spec_d_, spec_bf_, spec_rt_ };   // indices into specs
 
 static void test_header_ok ()
 {
-  Collector           collector = {};
-  SteelCheckReporter  reporter  = reporter_for_ ( &collector );
+  TestCollector       collector = {};
+  SteelCheckReporter  reporter  = test_reporter ( &collector );
   SteelCheckCsvHeader header    = {};
 
   // Any order, and a missing optional column: no diagnostics.
@@ -303,8 +226,8 @@ static void test_header_ok ()
 
 static void test_header_unknown_column ()
 {
-  Collector           collector = {};
-  SteelCheckReporter  reporter  = reporter_for_ ( &collector );
+  TestCollector       collector = {};
+  SteelCheckReporter  reporter  = test_reporter ( &collector );
   SteelCheckCsvHeader header    = {};
 
   // An unknown column is a warning only: the header is still valid, and the column is ignored.
@@ -314,15 +237,15 @@ static void test_header_unknown_column ()
                  STEELCHECK_OK );
 
   CHECK_SIZE_EQ ( collector.count, 1 );
-  CHECK ( diagnostic_is_( &collector, 0, STEELCHECK_SEVERITY_WARNING, 9, 2,
-                          "unknown column 'color'" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_WARNING, 9, 2,
+                              "unknown column 'color'" ) );
   CHECK_SIZE_EQ ( header.spec_of_column[1], steelcheck_csv_none );
 }
 
 static void test_header_all_problems_reported ()
 {
-  Collector           collector = {};
-  SteelCheckReporter  reporter  = reporter_for_ ( &collector );
+  TestCollector       collector = {};
+  SteelCheckReporter  reporter  = test_reporter ( &collector );
   SteelCheckCsvHeader header    = {};
 
   // Column 2 is empty, column 3 duplicates column 1, column 4 has a quote, column 5 has the wrong
@@ -337,24 +260,24 @@ static void test_header_all_problems_reported ()
   CHECK_SIZE_EQ ( collector.errors, 5 );
   CHECK_SIZE_EQ ( collector.warnings, 1 );
 
-  CHECK ( diagnostic_is_( &collector, 0, STEELCHECK_SEVERITY_ERROR,   4, 2,
-                          "empty column name" ) );
-  CHECK ( diagnostic_is_( &collector, 1, STEELCHECK_SEVERITY_ERROR,   4, 3,
-                          "duplicate column 'designation' (also column 1)" ) );
-  CHECK ( diagnostic_is_( &collector, 2, STEELCHECK_SEVERITY_ERROR,   4, 4,
-                          "quotes" ) );
-  CHECK ( diagnostic_is_( &collector, 3, STEELCHECK_SEVERITY_WARNING, 4, 5,
-                          "unknown column 'D_MM'" ) );
-  CHECK ( diagnostic_is_( &collector, 4, STEELCHECK_SEVERITY_ERROR,   4, 0,
-                          "missing required column 'd_mm'" ) );
-  CHECK ( diagnostic_is_( &collector, 5, STEELCHECK_SEVERITY_ERROR,   4, 0,
-                          "missing required column 'bf_mm'" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_ERROR,   4, 2,
+                              "empty column name" ) );
+  CHECK ( test_diagnostic_is( &collector, 1, STEELCHECK_SEVERITY_ERROR,   4, 3,
+                              "duplicate column 'designation' (also column 1)" ) );
+  CHECK ( test_diagnostic_is( &collector, 2, STEELCHECK_SEVERITY_ERROR,   4, 4,
+                              "quotes" ) );
+  CHECK ( test_diagnostic_is( &collector, 3, STEELCHECK_SEVERITY_WARNING, 4, 5,
+                              "unknown column 'D_MM'" ) );
+  CHECK ( test_diagnostic_is( &collector, 4, STEELCHECK_SEVERITY_ERROR,   4, 0,
+                              "missing required column 'd_mm'" ) );
+  CHECK ( test_diagnostic_is( &collector, 5, STEELCHECK_SEVERITY_ERROR,   4, 0,
+                              "missing required column 'bf_mm'" ) );
 }
 
 static void test_header_too_many_columns ()
 {
-  Collector           collector = {};
-  SteelCheckReporter  reporter  = reporter_for_ ( &collector );
+  TestCollector       collector = {};
+  SteelCheckReporter  reporter  = test_reporter ( &collector );
   SteelCheckCsvHeader header    = {};
 
   // 65 columns: designation, d_mm, bf_mm, then 62 more.
@@ -402,8 +325,8 @@ static void test_header_invalid_arguments ()
 
 static void test_rows ()
 {
-  Collector           collector = {};
-  SteelCheckReporter  reporter  = reporter_for_ ( &collector );
+  TestCollector       collector = {};
+  SteelCheckReporter  reporter  = test_reporter ( &collector );
   SteelCheckCsvHeader header    = {};
   SteelCheckView      fields[spec_count_];
 
@@ -437,8 +360,8 @@ static void test_rows ()
 
 static void test_rows_errors ()
 {
-  Collector           collector = {};
-  SteelCheckReporter  reporter  = reporter_for_ ( &collector );
+  TestCollector       collector = {};
+  SteelCheckReporter  reporter  = test_reporter ( &collector );
   SteelCheckCsvHeader header    = {};
   SteelCheckView      fields[spec_count_];
 
@@ -449,20 +372,20 @@ static void test_rows_errors ()
   CHECK_INT_EQ ( steelcheck_csv_split_row( &header, v_( "W150x13.0,148" ), 10, fields,
                                            spec_count_, &reporter ),
                  STEELCHECK_ERROR_SYNTAX );
-  CHECK ( diagnostic_is_( &collector, 0, STEELCHECK_SEVERITY_ERROR, 10, 0,
-                          "2 fields, but the header (line 9) has 3 columns" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_ERROR, 10, 0,
+                              "2 fields, but the header (line 9) has 3 columns" ) );
 
   CHECK_INT_EQ ( steelcheck_csv_split_row( &header, v_( "W150x13.0,148,100,7" ), 11, fields,
                                            spec_count_, &reporter ),
                  STEELCHECK_ERROR_SYNTAX );
-  CHECK ( diagnostic_is_( &collector, 1, STEELCHECK_SEVERITY_ERROR, 11, 0, "4 fields" ) );
+  CHECK ( test_diagnostic_is( &collector, 1, STEELCHECK_SEVERITY_ERROR, 11, 0, "4 fields" ) );
 
   // A quote is reported at its column, and a rejected row leaves no half-filled fields.
 
   CHECK_INT_EQ ( steelcheck_csv_split_row( &header, v_( "W150x13.0,\"148\",100" ), 12, fields,
                                            spec_count_, &reporter ),
                  STEELCHECK_ERROR_SYNTAX );
-  CHECK ( diagnostic_is_( &collector, 2, STEELCHECK_SEVERITY_ERROR, 12, 2, "quotes" ) );
+  CHECK ( test_diagnostic_is( &collector, 2, STEELCHECK_SEVERITY_ERROR, 12, 2, "quotes" ) );
   CHECK ( steelcheck_view_is_empty( fields[spec_designation_] ) );
 
   // A '\0' byte inside a field (a view has an explicit length, so it can hold one).
@@ -473,7 +396,7 @@ static void test_rows_errors ()
                                            (SteelCheckView) { sizeof with_nul - 1, with_nul },
                                            13, fields, spec_count_, &reporter ),
                  STEELCHECK_ERROR_SYNTAX );
-  CHECK ( diagnostic_is_( &collector, 3, STEELCHECK_SEVERITY_ERROR, 13, 2, "'\\0' byte" ) );
+  CHECK ( test_diagnostic_is( &collector, 3, STEELCHECK_SEVERITY_ERROR, 13, 2, "'\\0' byte" ) );
 
   // Too small a fields array.
 
@@ -506,8 +429,8 @@ constexpr size_t gerdau_spec_count_ = sizeof gerdau_specs_ / sizeof gerdau_specs
 
 static void test_gerdau_catalog ()
 {
-  Collector          collector = {};
-  SteelCheckReporter reporter  = reporter_for_ ( &collector );
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
   SteelCheckBuffer   buff      = {};
 
   CHECK_INT_EQ ( steelcheck_buffer_load( &buff, "data/gerdau_w_hp.csv" ), STEELCHECK_OK );

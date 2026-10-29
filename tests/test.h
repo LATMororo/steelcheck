@@ -2,6 +2,7 @@
 #define STEELCHECK_TEST_H
 
 #include "steelcheck/compat.h"
+#include "steelcheck/diagnostic.h"
 
 #include <stddef.h>
 
@@ -95,5 +96,45 @@ constexpr double test_abs_tol = 1e-12;
   } while ( 0 )
 
 #define RUN_TEST(fn) test_run ( #fn, fn )
+
+/*
+ *  Collecting diagnostics. A test passes test_reporter( &collector ) to the core functions; every
+ *  diagnostic they report is counted, and the first test_collector_capacity ones are copied, in
+ *  order, so the test can check them with test_diagnostic_is. Reset a collector by assigning
+ *  (TestCollector) {} to it.
+ */
+
+constexpr size_t test_collector_capacity = 16;
+
+typedef struct TestCollector
+{
+  size_t               count;      // diagnostics received (may exceed the capacity)
+  size_t               errors;     // of which errors
+  size_t               warnings;   // of which warnings
+  SteelCheckDiagnostic items[test_collector_capacity];
+} TestCollector;
+
+/*
+ *  The reporter callback: context is the TestCollector. Diagnostics only live during the call,
+ *  so they are copied.
+ */
+
+void test_collect ( void* context, const SteelCheckDiagnostic* diagnostic );
+
+/*
+ *  A reporter that sends diagnostics to collector, which must outlive the reporter's use.
+ */
+
+[[nodiscard]] SteelCheckReporter test_reporter ( TestCollector* collector );
+
+/*
+ *  True if diagnostic index exists and has the given severity, line and column, and its message
+ *  contains text. Otherwise prints what was received instead, to stderr, and returns false.
+ *  Use it inside CHECK, so a failure also reports the line of the test.
+ */
+
+[[nodiscard]] bool test_diagnostic_is ( const TestCollector* collector, size_t index,
+                                        SteelCheckSeverity severity, size_t line, size_t column,
+                                        const char* text );
 
 #endif // STEELCHECK_TEST_H

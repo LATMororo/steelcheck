@@ -110,6 +110,70 @@ void test_run ( const char* name, void (*fn) () )
 }
 
 //==================================================================================================
+//  test_collect
+//==================================================================================================
+
+void test_collect ( void* context, const SteelCheckDiagnostic* diagnostic )
+{
+  TestCollector* collector = context;
+
+  if ( collector->count < test_collector_capacity )
+  {
+    collector->items[collector->count] = *diagnostic;
+  }
+
+  collector->count++;
+
+  if ( diagnostic->severity == STEELCHECK_SEVERITY_ERROR )
+  {
+    collector->errors++;
+  }
+  else
+  {
+    collector->warnings++;
+  }
+}
+
+//==================================================================================================
+//  test_reporter
+//==================================================================================================
+
+SteelCheckReporter test_reporter ( TestCollector* collector )
+{
+  return (SteelCheckReporter) { .report = test_collect, .context = collector };
+}
+
+//==================================================================================================
+//  test_diagnostic_is
+//==================================================================================================
+
+bool test_diagnostic_is ( const TestCollector* collector, size_t index,
+                          SteelCheckSeverity severity, size_t line, size_t column,
+                          const char* text )
+{
+  if ( index >= collector->count || index >= test_collector_capacity )
+  {
+    fprintf ( stderr, "    no diagnostic %zu (%zu received)\n", index, collector->count );
+    return false;
+  }
+
+  const SteelCheckDiagnostic* d = &collector->items[index];
+
+  if ( d->severity == severity && d->line == line && d->column == column
+       && strstr( d->message, text ) != nullptr )
+  {
+    return true;
+  }
+
+  fprintf ( stderr, "    diagnostic %zu is %s at %zu:%zu: %s\n", index,
+            steelcheck_severity_name( d->severity ), d->line, d->column, d->message );
+  fprintf ( stderr, "    expected     %s at %zu:%zu, containing: %s\n",
+            steelcheck_severity_name( severity ), line, column, text );
+
+  return false;
+}
+
+//==================================================================================================
 //  test_summary
 //==================================================================================================
 

@@ -10,52 +10,6 @@
 #include <stdio.h>
 #include <string.h>
 
-//==================================================================================================
-//  Test reporter (same idea as in test_csv.c)
-//==================================================================================================
-
-constexpr size_t collector_capacity_ = 16;
-
-typedef struct Collector
-{
-  size_t               count;
-  SteelCheckDiagnostic items[collector_capacity_];
-} Collector;
-
-static void collect_ ( void* context, const SteelCheckDiagnostic* diagnostic )
-{
-  Collector* collector = context;
-
-  if ( collector->count < collector_capacity_ )
-  {
-    collector->items[collector->count] = *diagnostic;
-  }
-
-  collector->count++;
-}
-
-/*
- *  True if diagnostic i exists, is at column, and its message contains text.
- */
-
-static bool diagnostic_is_ ( const Collector* collector, size_t i, size_t column, const char* text )
-{
-  if ( i >= collector->count || i >= collector_capacity_ )
-  {
-    fprintf ( stderr, "    no diagnostic %zu (only %zu)\n", i, collector->count );
-    return false;
-  }
-
-  const SteelCheckDiagnostic* d = &collector->items[i];
-
-  if ( d->column != column || strstr( d->message, text ) == nullptr )
-  {
-    fprintf ( stderr, "    diagnostic %zu at column %zu: %s\n", i, d->column, d->message );
-    return false;
-  }
-
-  return true;
-}
 
 //==================================================================================================
 //  Rows used by the tests
@@ -79,9 +33,9 @@ static constexpr char w150_row_[] =
  */
 
 static SteelCheckStatus convert_ ( const char* header_line, const char* row,
-                                   SteelCheckSection* section, Collector* collector )
+                                   SteelCheckSection* section, TestCollector* collector )
 {
-  SteelCheckReporter  reporter = { .report = collect_, .context = collector };
+  SteelCheckReporter  reporter = test_reporter ( collector );
   SteelCheckCsvHeader header   = {};
   SteelCheckView      fields[STEELCHECK_FIELD_COUNT];
 
@@ -141,7 +95,7 @@ static void test_columns_table ()
 
 static void test_row_w150 ()
 {
-  Collector         collector = {};
+  TestCollector     collector = {};
   SteelCheckSection s         = {};
 
   CHECK_INT_EQ ( convert_( header_line_, w150_row_, &s, &collector ), STEELCHECK_OK );
@@ -197,7 +151,7 @@ static void test_row_optional_columns ()
     "HP,HP200x53.0,53.0,204,207,11.3,11.3,181,161,10,68.1,4977,488.0,8.55,551.3,1673,161.7,4.96,"
     "248.6,31.93,155075";
 
-  Collector         collector = {};
+  TestCollector     collector = {};
   SteelCheckSection s         = {};
 
   CHECK_INT_EQ ( convert_( header, row, &s, &collector ), STEELCHECK_OK );
@@ -241,17 +195,22 @@ static void test_row_problems ()
     "W150x13.0,X,2,0,13.0,12mm,100,4.3,4.9,138,118,16.6,,85.8,6.18,96.4,82,16.4,2.22,25.5,2.60,"
     "1.72,10.20,27.49,1e400,0.67,W6x8.5";
 
-  Collector         collector = {};
+  TestCollector     collector = {};
   SteelCheckSection s         = {};
 
   CHECK_INT_EQ ( convert_( header_line_, row, &s, &collector ), STEELCHECK_ERROR_VALUE );
 
   CHECK_SIZE_EQ ( collector.count, 5 );
-  CHECK ( diagnostic_is_( &collector, 0,  2, "column 'family': expected W or HP, got 'X'" ) );
-  CHECK ( diagnostic_is_( &collector, 1,  3, "column 'h_shape': expected 0 or 1, got '2'" ) );
-  CHECK ( diagnostic_is_( &collector, 2,  6, "column 'd_mm': invalid number '12mm'" ) );
-  CHECK ( diagnostic_is_( &collector, 3, 13, "column 'Ix_cm4': missing value" ) );
-  CHECK ( diagnostic_is_( &collector, 4, 25, "column 'Cw_cm6': number out of range '1e400'" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_ERROR, 2, 2,
+                              "column 'family': expected W or HP, got 'X'" ) );
+  CHECK ( test_diagnostic_is( &collector, 1, STEELCHECK_SEVERITY_ERROR, 2, 3,
+                              "column 'h_shape': expected 0 or 1, got '2'" ) );
+  CHECK ( test_diagnostic_is( &collector, 2, STEELCHECK_SEVERITY_ERROR, 2, 6,
+                              "column 'd_mm': invalid number '12mm'" ) );
+  CHECK ( test_diagnostic_is( &collector, 3, STEELCHECK_SEVERITY_ERROR, 2, 13,
+                              "column 'Ix_cm4': missing value" ) );
+  CHECK ( test_diagnostic_is( &collector, 4, STEELCHECK_SEVERITY_ERROR, 2, 25,
+                              "column 'Cw_cm6': number out of range '1e400'" ) );
 
   // A rejected row leaves an all-zero section, not a half-filled one.
 
@@ -265,11 +224,12 @@ static void test_row_long_designation ()
     "W150x13.0-this-designation-is-too-long,W,0,0,13.0,148,100,4.3,4.9,138,118,16.6,635,85.8,"
     "6.18,96.4,82,16.4,2.22,25.5,2.60,1.72,10.20,27.49,4181,0.67,W6x8.5";
 
-  Collector         collector = {};
+  TestCollector     collector = {};
   SteelCheckSection s         = {};
 
   CHECK_INT_EQ ( convert_( header_line_, row, &s, &collector ), STEELCHECK_ERROR_VALUE );
-  CHECK ( diagnostic_is_( &collector, 0, 1, "is longer than 31 characters" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_ERROR, 2, 1,
+                              "is longer than 31 characters" ) );
 }
 
 static void test_row_invalid_arguments ()
@@ -303,8 +263,8 @@ static void test_row_invalid_arguments ()
 
 static void test_gerdau_sections ()
 {
-  Collector          collector = {};
-  SteelCheckReporter reporter  = { .report = collect_, .context = &collector };
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
   SteelCheckBuffer   buff      = {};
 
   CHECK_INT_EQ ( steelcheck_buffer_load( &buff, "data/gerdau_w_hp.csv" ), STEELCHECK_OK );
@@ -382,6 +342,57 @@ static void test_gerdau_sections ()
 }
 
 //==================================================================================================
+//  Designation keys
+//==================================================================================================
+
+/*
+ *  True if designation has the key expected (or, for expected == nullptr, no key at all).
+ */
+
+static bool key_is_ ( const char* designation, const char* expected )
+{
+  char key[32];
+  bool ok = steelcheck_designation_key ( designation, key, sizeof key );
+
+  if ( expected == nullptr ? ok || key[0] != '\0' : !ok || strcmp( key, expected ) != 0 )
+  {
+    fprintf ( stderr, "    key of \"%s\" is \"%s\" (%s)\n", designation ? designation : "(null)",
+              key, ok ? "ok" : "failed" );
+    return false;
+  }
+
+  return true;
+}
+
+static void test_designation_key ()
+{
+  CHECK ( key_is_( "W150x13.0",      "W150X13.0" ) );
+  CHECK ( key_is_( "w150X13.0",      "W150X13.0" ) );    // case
+  CHECK ( key_is_( "W 150 x 13,0",   "W150X13.0" ) );    // the catalog's printed form
+  CHECK ( key_is_( "\tW150 x13.0 ",  "W150X13.0" ) );    // tabs and spaces anywhere
+  CHECK ( key_is_( "W360x58",        "W360X58.0" ) );    // missing ".0"
+  CHECK ( key_is_( "HP 310 x 132",   "HP310X132.0" ) );
+  CHECK ( key_is_( "W150-light",     "W150-LIGHT.0" ) ); // other characters are kept
+
+  // Nothing left, nullptr, or too long for the key buffer (32 bytes here).
+
+  CHECK ( key_is_( "",    nullptr ) );
+  CHECK ( key_is_( "  ",  nullptr ) );
+  CHECK ( key_is_( nullptr, nullptr ) );
+  CHECK ( key_is_( "W150x13.0-with-a-very-long-suffix", nullptr ) );
+
+  // Exactly fitting: 29 characters + ".0" + '\0' = 32 bytes; one more does not fit.
+
+  CHECK ( key_is_( "W1234567890123456789012345678",  "W1234567890123456789012345678.0" ) );
+  CHECK ( key_is_( "W12345678901234567890123456789", nullptr ) );
+
+  char key[4];
+
+  CHECK ( !steelcheck_designation_key( "W1", nullptr, 4 ) );
+  CHECK ( !steelcheck_designation_key( "W1", key, 0 ) );
+}
+
+//==================================================================================================
 //  Validation: derived values
 //==================================================================================================
 
@@ -403,8 +414,8 @@ static SteelCheckSection w150_ ()
 
 static void test_validate_derived ()
 {
-  Collector          collector = {};
-  SteelCheckReporter reporter  = { .report = collect_, .context = &collector };
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
   SteelCheckSection  s         = w150_ ();
 
   CHECK_INT_EQ ( steelcheck_section_validate( &s, &reporter ), STEELCHECK_OK );
@@ -447,8 +458,8 @@ static void test_validate_given_r ()
     "HP,HP200x53.0,53.0,204,207,11.3,11.3,181,161,10,68.1,4977,488.0,8.55,551.3,1673,161.7,4.96,"
     "248.6,31.93,155075";
 
-  Collector          collector = {};
-  SteelCheckReporter reporter  = { .report = collect_, .context = &collector };
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
   SteelCheckSection  s         = {};
 
   CHECK_INT_EQ ( convert_( header, row, &s, nullptr ), STEELCHECK_OK );
@@ -473,8 +484,8 @@ static void test_validate_errors ()
   // Five errors at once: a negative mass, tf too thick for d, d' larger than h, Ix and Iy
   // swapped, and a W designation for an HP section. All are reported.
 
-  Collector          collector = {};
-  SteelCheckReporter reporter  = { .report = collect_, .context = &collector };
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
   SteelCheckSection  s         = w150_ ();
 
   double ix = s.Ix;
@@ -489,12 +500,16 @@ static void test_validate_errors ()
   CHECK_INT_EQ ( steelcheck_section_validate( &s, &reporter ), STEELCHECK_ERROR_VALUE );
 
   CHECK_SIZE_EQ ( collector.count, 5 );
-  CHECK ( diagnostic_is_( &collector, 0, 0, "W150x13.0: mass_kg_m must be positive, got -13" ) );
-  CHECK ( diagnostic_is_( &collector, 1, 0, "tf_mm 80 is not less than d / 2 = 74" ) );
-  CHECK ( diagnostic_is_( &collector, 2, 0, "dp_mm 140 is greater than h_mm 138" ) );
-  CHECK ( diagnostic_is_( &collector, 3, 0,
-                          "Iy_cm4 635 is greater than Ix_cm4 82 (axes swapped?)" ) );
-  CHECK ( diagnostic_is_( &collector, 4, 0, "designation does not match family HP" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_ERROR, 2, 0,
+                              "W150x13.0: mass_kg_m must be positive, got -13" ) );
+  CHECK ( test_diagnostic_is( &collector, 1, STEELCHECK_SEVERITY_ERROR, 2, 0,
+                              "tf_mm 80 is not less than d / 2 = 74" ) );
+  CHECK ( test_diagnostic_is( &collector, 2, STEELCHECK_SEVERITY_ERROR, 2, 0,
+                              "dp_mm 140 is greater than h_mm 138" ) );
+  CHECK ( test_diagnostic_is( &collector, 3, STEELCHECK_SEVERITY_ERROR, 2, 0,
+                              "Iy_cm4 635 is greater than Ix_cm4 82 (axes swapped?)" ) );
+  CHECK ( test_diagnostic_is( &collector, 4, STEELCHECK_SEVERITY_ERROR, 2, 0,
+                              "designation does not match family HP" ) );
 
   for ( size_t i = 0; i < 5; i++ )
   {
@@ -513,8 +528,8 @@ static void test_validate_more_errors ()
 {
   // The remaining geometric relations, and a zero value (not positive either).
 
-  Collector          collector = {};
-  SteelCheckReporter reporter  = { .report = collect_, .context = &collector };
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
   SteelCheckSection  s         = w150_ ();
 
   s.tw = 120.0;    // wider than bf = 100
@@ -526,11 +541,16 @@ static void test_validate_more_errors ()
   CHECK_INT_EQ ( steelcheck_section_validate( &s, &reporter ), STEELCHECK_ERROR_VALUE );
 
   CHECK_SIZE_EQ ( collector.count, 5 );
-  CHECK ( diagnostic_is_( &collector, 0, 0, "J_cm4 must be positive, got 0" ) );
-  CHECK ( diagnostic_is_( &collector, 1, 0, "tw_mm 120 is not less than bf_mm 100" ) );
-  CHECK ( diagnostic_is_( &collector, 2, 0, "h_mm 150 is not less than d_mm 148" ) );
-  CHECK ( diagnostic_is_( &collector, 3, 0, "Zx_cm3 80 is less than Wx_cm3 85.8" ) );
-  CHECK ( diagnostic_is_( &collector, 4, 0, "Zy_cm3 10 is less than Wy_cm3 16.4" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_ERROR, 2, 0,
+                              "J_cm4 must be positive, got 0" ) );
+  CHECK ( test_diagnostic_is( &collector, 1, STEELCHECK_SEVERITY_ERROR, 2, 0,
+                              "tw_mm 120 is not less than bf_mm 100" ) );
+  CHECK ( test_diagnostic_is( &collector, 2, STEELCHECK_SEVERITY_ERROR, 2, 0,
+                              "h_mm 150 is not less than d_mm 148" ) );
+  CHECK ( test_diagnostic_is( &collector, 3, STEELCHECK_SEVERITY_ERROR, 2, 0,
+                              "Zx_cm3 80 is less than Wx_cm3 85.8" ) );
+  CHECK ( test_diagnostic_is( &collector, 4, STEELCHECK_SEVERITY_ERROR, 2, 0,
+                              "Zy_cm3 10 is less than Wy_cm3 16.4" ) );
 }
 
 //==================================================================================================
@@ -539,8 +559,8 @@ static void test_validate_more_errors ()
 
 static void test_validate_warnings ()
 {
-  Collector          collector = {};
-  SteelCheckReporter reporter  = { .report = collect_, .context = &collector };
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
   SteelCheckSection  s         = w150_ ();
 
   // Wx 10 % too large, and a wrongly printed lambda_f: warnings, the section is still valid.
@@ -551,10 +571,10 @@ static void test_validate_warnings ()
   CHECK_INT_EQ ( steelcheck_section_validate( &s, &reporter ), STEELCHECK_OK );
 
   CHECK_SIZE_EQ ( collector.count, 2 );
-  CHECK ( diagnostic_is_( &collector, 0, 0,
-                          "W150x13.0: Wx_cm3 94.38 differs from 2 Ix / d = 85.81 (+10.0 %)" ) );
-  CHECK ( diagnostic_is_( &collector, 1, 0,
-                          "lambda_f 12 differs from bf / (2 tf) = 10.2 (+17.6 %)" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_WARNING, 2, 0,
+                              "W150x13.0: Wx_cm3 94.38 differs from 2 Ix / d = 85.81 (+10.0 %)" ) );
+  CHECK ( test_diagnostic_is( &collector, 1, STEELCHECK_SEVERITY_WARNING, 2, 0,
+                              "lambda_f 12 differs from bf / (2 tf) = 10.2 (+17.6 %)" ) );
 
   CHECK_INT_EQ ( collector.items[0].severity, STEELCHECK_SEVERITY_WARNING );
   CHECK_INT_EQ ( collector.items[0].status, STEELCHECK_ERROR_INCONSISTENT );
@@ -568,8 +588,8 @@ static void test_validate_tolerances ()
 {
   // Just inside and just outside the exact tolerance (1 %) for rx = 61.8 mm (6.18 cm).
 
-  Collector          collector = {};
-  SteelCheckReporter reporter  = { .report = collect_, .context = &collector };
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
   SteelCheckSection  s         = w150_ ();
   double             rx        = sqrt( s.Ix / s.A );
 
@@ -581,11 +601,12 @@ static void test_validate_tolerances ()
   s.rx = rx * ( 1.0 + 0.011 );
   CHECK_INT_EQ ( steelcheck_section_validate( &s, &reporter ), STEELCHECK_OK );
   CHECK_SIZE_EQ ( collector.count, 1 );
-  CHECK ( diagnostic_is_( &collector, 0, 0, "rx_cm" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_WARNING, 2, 0,
+                              "rx_cm" ) );
 
   // The mass has a wider tolerance (5 %): 4 % below A x 7850 kg/m^3 is accepted.
 
-  collector = (Collector) {};
+  collector = (TestCollector) {};
   s         = w150_ ();
   s.mass    = 0.96 * s.A * 1e-6 * 7850.0;
   CHECK_INT_EQ ( steelcheck_section_validate( &s, &reporter ), STEELCHECK_OK );
@@ -593,15 +614,16 @@ static void test_validate_tolerances ()
   // ... but then the designation's 13.0 no longer matches (more than 0.5 %).
 
   CHECK_SIZE_EQ ( collector.count, 1 );
-  CHECK ( diagnostic_is_( &collector, 0, 0, "differs from the designation's 13" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_WARNING, 2, 0,
+                              "differs from the designation's 13" ) );
 }
 
 static void test_validate_designation_without_mass ()
 {
   // A designation without a number after 'x' is accepted; only its mass check is skipped.
 
-  Collector          collector = {};
-  SteelCheckReporter reporter  = { .report = collect_, .context = &collector };
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
   SteelCheckSection  s         = w150_ ();
 
   strcpy ( s.designation, "W150-light" );
@@ -627,8 +649,8 @@ static void test_gerdau_validation ()
   // Every section is valid; the only finding is the known W610x153.0 inconsistency of the
   // catalog itself (mass printed as 154.2 kg/m).
 
-  Collector          collector = {};
-  SteelCheckReporter reporter  = { .report = collect_, .context = &collector };
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
   SteelCheckBuffer   buff      = {};
 
   CHECK_INT_EQ ( steelcheck_buffer_load( &buff, "data/gerdau_w_hp.csv" ), STEELCHECK_OK );
@@ -674,8 +696,8 @@ static void test_gerdau_validation ()
   CHECK_SIZE_EQ ( valid, 108 );
   CHECK_SIZE_EQ ( computed_r, 108 );
   CHECK_SIZE_EQ ( collector.count, 1 );
-  CHECK ( diagnostic_is_( &collector, 0, 0,
-                          "W610x153.0: mass_kg_m 154.2 differs from the designation's 153" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_WARNING, 113, 0,
+                              "W610x153.0: mass_kg_m 154.2 differs from the designation's 153" ) );
   CHECK_SIZE_EQ ( collector.items[0].line, 113 );
   CHECK_INT_EQ ( collector.items[0].severity, STEELCHECK_SEVERITY_WARNING );
 
@@ -696,6 +718,7 @@ void test_section_suite ()
   RUN_TEST ( test_row_long_designation );
   RUN_TEST ( test_row_invalid_arguments );
   RUN_TEST ( test_gerdau_sections );
+  RUN_TEST ( test_designation_key );
   RUN_TEST ( test_validate_derived );
   RUN_TEST ( test_validate_given_r );
   RUN_TEST ( test_validate_errors );

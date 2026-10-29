@@ -6,74 +6,17 @@
 #include <stdio.h>
 #include <string.h>
 
-//==================================================================================================
-//  Test reporter (same idea as in test_csv.c and test_section.c)
-//==================================================================================================
-
-constexpr size_t collector_capacity_ = 16;
-
-typedef struct Collector
-{
-  size_t               count;
-  size_t               errors;
-  size_t               warnings;
-  SteelCheckDiagnostic items[collector_capacity_];
-} Collector;
-
-static void collect_ ( void* context, const SteelCheckDiagnostic* diagnostic )
-{
-  Collector* collector = context;
-
-  if ( collector->count < collector_capacity_ )
-  {
-    collector->items[collector->count] = *diagnostic;
-  }
-
-  collector->count++;
-
-  if ( diagnostic->severity == STEELCHECK_SEVERITY_ERROR )
-  {
-    collector->errors++;
-  }
-  else
-  {
-    collector->warnings++;
-  }
-}
-
-/*
- *  True if diagnostic i exists, is at line, and its message contains text.
- */
-
-static bool diagnostic_is_ ( const Collector* collector, size_t i, size_t line, const char* text )
-{
-  if ( i >= collector->count || i >= collector_capacity_ )
-  {
-    fprintf ( stderr, "    no diagnostic %zu (only %zu)\n", i, collector->count );
-    return false;
-  }
-
-  const SteelCheckDiagnostic* d = &collector->items[i];
-
-  if ( d->line != line || strstr( d->message, text ) == nullptr )
-  {
-    fprintf ( stderr, "    diagnostic %zu at line %zu: %s\n", i, d->line, d->message );
-    return false;
-  }
-
-  return true;
-}
-
 /*
  *  Loads text into an empty database, with diagnostics going to collector.
  */
 
-static SteelCheckStatus load_ ( SteelCheckDatabase* db, const char* text, Collector* collector )
+static SteelCheckStatus load_ ( SteelCheckDatabase* db, const char* text, TestCollector* collector )
 {
-  SteelCheckReporter reporter = { .report = collect_, .context = collector };
+  SteelCheckReporter reporter = test_reporter ( collector );
 
   return steelcheck_database_load ( db, steelcheck_view_from_cstr( text ), &reporter );
 }
+
 
 //==================================================================================================
 //  CSV texts used by the tests
@@ -103,7 +46,7 @@ static SteelCheckStatus load_ ( SteelCheckDatabase* db, const char* text, Collec
 
 static void test_load_small ()
 {
-  Collector          collector = {};
+  TestCollector      collector = {};
   SteelCheckDatabase db        = {};
 
   CHECK_INT_EQ ( load_( &db, "# catalog: test catalog\n"
@@ -150,7 +93,7 @@ static void test_load_duplicate ()
 {
   // The same section twice, spelled differently: one error, and the database stays empty.
 
-  Collector          collector = {};
+  TestCollector      collector = {};
   SteelCheckDatabase db        = {};
 
   CHECK_INT_EQ ( load_( &db, HEADER_ W150_13_ W150_18_
@@ -160,8 +103,8 @@ static void test_load_duplicate ()
                  STEELCHECK_ERROR_DUPLICATE );
 
   CHECK_SIZE_EQ ( collector.count, 1 );
-  CHECK ( diagnostic_is_( &collector, 0, 4,
-                          "duplicate designation 'w150X13.0' (also line 2: 'W150x13.0')" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_ERROR, 4, 0,
+                              "duplicate designation 'w150X13.0' (also line 2: 'W150x13.0')" ) );
   CHECK_INT_EQ ( collector.items[0].status, STEELCHECK_ERROR_DUPLICATE );
 
   CHECK ( db.sections == nullptr );
@@ -174,7 +117,7 @@ static void test_load_all_errors_reported ()
   // (conversion). Line 5: too few fields (CSV). All three errors are reported; the result is the
   // status of the first one, and the database stays empty although line 3 was fine.
 
-  Collector          collector = {};
+  TestCollector      collector = {};
   SteelCheckDatabase db        = {};
 
   CHECK_INT_EQ ( load_( &db, HEADER_
@@ -188,9 +131,12 @@ static void test_load_all_errors_reported ()
                  STEELCHECK_ERROR_VALUE );
 
   CHECK_SIZE_EQ ( collector.errors, 3 );
-  CHECK ( diagnostic_is_( &collector, 0, 2, "J_cm4 must be positive, got -1.72" ) );
-  CHECK ( diagnostic_is_( &collector, 1, 4, "column 'family': expected W or HP, got 'X'" ) );
-  CHECK ( diagnostic_is_( &collector, 2, 5, "5 fields, but the header (line 1) has 27 columns" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_ERROR, 2, 0,
+                              "J_cm4 must be positive, got -1.72" ) );
+  CHECK ( test_diagnostic_is( &collector, 1, STEELCHECK_SEVERITY_ERROR, 4, 2,
+                              "column 'family': expected W or HP, got 'X'" ) );
+  CHECK ( test_diagnostic_is( &collector, 2, STEELCHECK_SEVERITY_ERROR, 5, 0,
+                              "5 fields, but the header (line 1) has 27 columns" ) );
 
   CHECK_SIZE_EQ ( db.count, 0 );
   CHECK ( db.sections == nullptr );
@@ -198,34 +144,37 @@ static void test_load_all_errors_reported ()
 
 static void test_load_header_problems ()
 {
-  Collector          collector = {};
+  TestCollector      collector = {};
   SteelCheckDatabase db        = {};
 
   // No data line at all: no header.
 
   CHECK_INT_EQ ( load_( &db, "# only a comment\n\n", &collector ), STEELCHECK_ERROR_HEADER );
-  CHECK ( diagnostic_is_( &collector, 0, 0, "no header line" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_ERROR, 0, 0,
+                              "no header line" ) );
 
   CHECK_INT_EQ ( load_( &db, "", &collector ), STEELCHECK_ERROR_HEADER );
 
   // A header without required columns: the rows after it are not even read.
 
-  collector = (Collector) {};
+  collector = (TestCollector) {};
 
   CHECK_INT_EQ ( load_( &db, "designation,family\nW150x13.0,W\n", &collector ),
                  STEELCHECK_ERROR_HEADER );
   CHECK_SIZE_EQ ( collector.errors, 18 );   // 20 required columns, 2 present
-  CHECK ( diagnostic_is_( &collector, 0, 1, "missing required column 'mass_kg_m'" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_ERROR, 1, 0,
+                              "missing required column 'mass_kg_m'" ) );
   CHECK_SIZE_EQ ( db.count, 0 );
 
   // A header and no rows: an empty database is valid, with a warning.
 
-  collector = (Collector) {};
+  collector = (TestCollector) {};
 
   CHECK_INT_EQ ( load_( &db, HEADER_, &collector ), STEELCHECK_OK );
   CHECK_SIZE_EQ ( db.count, 0 );
   CHECK_SIZE_EQ ( collector.warnings, 1 );
-  CHECK ( diagnostic_is_( &collector, 0, 1, "no sections after the header" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_WARNING, 1, 0,
+                              "no sections after the header" ) );
 
   steelcheck_database_free ( &db );
 }
@@ -247,7 +196,7 @@ static void test_load_growth ()
 
   CHECK ( used < sizeof text );
 
-  Collector          collector = {};
+  TestCollector      collector = {};
   SteelCheckDatabase db        = {};
 
   CHECK_INT_EQ ( load_( &db, text, &collector ), STEELCHECK_OK );
@@ -285,7 +234,7 @@ static void test_load_metadata_limits ()
 
   CHECK ( used < sizeof text );
 
-  Collector          collector = {};
+  TestCollector      collector = {};
   SteelCheckDatabase db        = {};
 
   CHECK_INT_EQ ( load_( &db, text, &collector ), STEELCHECK_OK );
@@ -296,16 +245,19 @@ static void test_load_metadata_limits ()
   CHECK ( steelcheck_database_metadata( &db, "key15" ) == nullptr );
 
   CHECK_SIZE_EQ ( collector.warnings, 3 );
-  CHECK ( diagnostic_is_( &collector, 0, 2,  "metadata 'a' given twice" ) );
-  CHECK ( diagnostic_is_( &collector, 1, 3,  "metadata 'long' ignored (too long)" ) );
-  CHECK ( diagnostic_is_( &collector, 2, 19, "metadata 'key15' ignored (at most 16 entries)" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_WARNING, 2, 0,
+                              "metadata 'a' given twice" ) );
+  CHECK ( test_diagnostic_is( &collector, 1, STEELCHECK_SEVERITY_WARNING, 3, 0,
+                              "metadata 'long' ignored (too long)" ) );
+  CHECK ( test_diagnostic_is( &collector, 2, STEELCHECK_SEVERITY_WARNING, 19, 0,
+                              "metadata 'key15' ignored (at most 16 entries)" ) );
 
   steelcheck_database_free ( &db );
 }
 
 static void test_load_invalid_arguments ()
 {
-  Collector          collector = {};
+  TestCollector      collector = {};
   SteelCheckDatabase db        = {};
 
   CHECK_INT_EQ ( load_( nullptr, HEADER_ W150_13_, &collector ),
@@ -335,8 +287,8 @@ static void test_load_invalid_arguments ()
 
 static void test_load_file_gerdau ()
 {
-  Collector          collector = {};
-  SteelCheckReporter reporter  = { .report = collect_, .context = &collector };
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
   SteelCheckDatabase db        = {};
 
   CHECK_INT_EQ ( steelcheck_database_load_file( &db, "data/gerdau_w_hp.csv", &reporter ),
@@ -347,7 +299,8 @@ static void test_load_file_gerdau ()
   CHECK_SIZE_EQ ( db.count, 108 );
   CHECK_SIZE_EQ ( collector.errors, 0 );
   CHECK_SIZE_EQ ( collector.warnings, 1 );
-  CHECK ( diagnostic_is_( &collector, 0, 113, "W610x153.0: mass_kg_m 154.2" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_WARNING, 113, 0,
+                              "W610x153.0: mass_kg_m 154.2" ) );
 
   CHECK_STR_EQ ( steelcheck_database_metadata( &db, "edition" ), "08/25" );
   CHECK ( strstr( steelcheck_database_metadata( &db, "catalog" ), "Gerdau" ) != nullptr );
@@ -375,13 +328,14 @@ static void test_load_file_gerdau ()
 
 static void test_load_file_missing ()
 {
-  Collector          collector = {};
-  SteelCheckReporter reporter  = { .report = collect_, .context = &collector };
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
   SteelCheckDatabase db        = {};
 
   CHECK_INT_EQ ( steelcheck_database_load_file( &db, "tests/data/does_not_exist.csv", &reporter ),
                  STEELCHECK_ERROR_OPEN );
-  CHECK ( diagnostic_is_( &collector, 0, 0, "tests/data/does_not_exist.csv: cannot open file" ) );
+  CHECK ( test_diagnostic_is( &collector, 0, STEELCHECK_SEVERITY_ERROR, 0, 0,
+                              "tests/data/does_not_exist.csv: cannot open file" ) );
   CHECK_SIZE_EQ ( db.count, 0 );
 }
 
