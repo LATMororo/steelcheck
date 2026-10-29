@@ -5,13 +5,14 @@ steel cross sections according to ABNT NBR 8800:2024. AISC 360 and Eurocode 3 ar
 Sections are read from a CSV database, and results will be written as text, HTML or PDF
 reports showing the main equations.
 
-**Status:** step 0, project skeleton (`--help`, `--version`, test framework).
+**Status:** section database and the `list` and `show` commands; design checks are next.
 
 ## Requirements
 
 - A C23 compiler, used in `-std=c23` mode:
   - Clang 19 or newer, or GCC 15 or newer, for all features;
-  - GCC 14 works, except for the built-in section database (planned; it needs `#embed`).
+  - GCC 14 works, but builds the program without the built-in section database (it needs
+    `#embed`); `steelcheck --version` tells whether a build has it.
 - GNU Make.
 - Linux, or Windows with [MSYS2](https://www.msys2.org/) (build from the **UCRT64** shell).
 
@@ -28,6 +29,26 @@ make clean                # remove build/
 ```
 
 Then run `build/debug/steelcheck --help`.
+
+## Usage
+
+```sh
+steelcheck list                       # every section of the built-in Gerdau catalog
+steelcheck list W310                  # sections whose designation starts with W310
+steelcheck show W310x38.7             # every property of one section
+steelcheck show W 310 x 38,7          # spaces, lower case, decimal comma accepted
+steelcheck -q list HP                 # -q hides warnings about the database
+
+steelcheck --db my_sections.csv list  # another database (same CSV format)
+export STEELCHECK_DB=my_sections.csv  # ... or as the default, instead of --db
+```
+
+The database is the `--db` file, else the `STEELCHECK_DB` file, else the built-in catalog
+(`data/gerdau_w_hp.csv`, embedded in the program at compile time with C23 `#embed`).
+
+Problems in the database are reported like compiler messages, e.g.
+`<built-in>:113: warning: W610x153.0: mass_kg_m 154.2 differs from the designation's 153`.
+Exit codes: 0 success, 1 runtime error (unusable database, section not found), 2 usage error.
 
 ## Section data
 
