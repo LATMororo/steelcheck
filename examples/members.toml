@@ -1,0 +1,73 @@
+# steelcheck input file: the members to check (a small subset of TOML).
+#
+# Units in this file: lengths in m, An in cm^2, forces in kN, moments in kN m.
+# Signs: tension positive, compression negative.
+#
+#     steelcheck check examples/members.toml
+#     steelcheck --html report.html check examples/members.toml
+
+code     = "NBR 8800"
+material = "A572 Gr.50"            # the material of members that give none
+
+# A column: compression and bending about the major axis.
+
+[[member]]
+label   = "C1"
+section = "W 310 x 52.0"           # spaces, lower case and a decimal comma are accepted
+length  = 3.5
+Ky      = 1.0
+Lb      = 3.5
+Cb      = 1.0
+NSd     = -600
+MxSd    = 80
+VySd    = 40
+
+# A simply supported beam under a uniform load, braced at mid-span. Instead of Cb, the moments
+# in the unbraced half span (from the support to mid-span) at 1/4, 1/2 and 3/4 of Lb: the code
+# computes Cb from them (5.4.2.3 a)). Mmax is left out: it is then the largest of MA, MB, MC
+# and MxSd, here MxSd at mid-span.
+
+[[member]]
+label   = "V1"
+section = "W 410 x 53.0"
+length  = 6.0
+Lb      = 3.0
+MA      = 113.75                   # [kN m]
+MB      = 195
+MC      = 243.75
+MxSd    = 260
+VySd    = 170
+
+# A continuous beam whose top flange is braced by the slab: at the interior support the bottom
+# (free) flange is compressed. Cb by 5.4.2.4 a), from the moments in the span; negative moments
+# compress the free flange. Lb is the unbraced length of the free flange, the whole span.
+
+[[member]]
+label   = "V2"
+section = "W 310 x 38.7"
+length  = 6.0
+M1      = -150                     # [kN m] at the interior support
+M2      = -60                      # at the other end
+MCL     = 40                       # at mid-span: tensions the free flange
+MxSd    = 150
+VySd    = 110
+
+# A tension diagonal with a bolted end: net area and shear lag.
+
+[[member]]
+label    = "D1"
+section  = "W 150 x 22.5"
+material = "ASTM A36"
+length   = 4.2
+An       = 24.0                     # cm^2
+Ct       = 0.90
+NSd      = 520
+
+# No design forces: only the resistances are computed.
+
+[[member]]
+label   = "P1"
+section = "HP 250 x 62.0"
+length  = 4.0
+Kx      = 0.8
+Ky      = 0.8
