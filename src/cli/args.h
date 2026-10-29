@@ -17,9 +17,10 @@
 
 typedef enum CliCommand : int
 {
-  CLI_COMMAND_NONE = 0,   // only --help or --version
-  CLI_COMMAND_LIST = 1,   // list [FILTER]
-  CLI_COMMAND_SHOW = 2,   // show DESIGNATION...
+  CLI_COMMAND_NONE  = 0,   // only --help or --version
+  CLI_COMMAND_LIST  = 1,   // list [FILTER]
+  CLI_COMMAND_SHOW  = 2,   // show DESIGNATION...
+  CLI_COMMAND_CHECK = 3,   // check INPUT
 } CliCommand;
 
 /*
@@ -33,7 +34,9 @@ typedef struct CliOptions
   bool               help;      // -h, --help
   bool               version;   // -V, --version
   bool               quiet;     // -q, --quiet: do not print warnings
-  const char*        db_path;   // -d FILE, --db FILE, --db=FILE; nullptr if not given
+  const char*        db_path;     // -d FILE, --db FILE, --db=FILE; nullptr if not given
+  const char*        html_path;   // --html FILE, --html=FILE: the check command also writes an
+                                  // HTML report there; nullptr if not given
 
   CliCommand         command;
   const char* const* args;      // the arguments after the command (points into argv)
@@ -46,8 +49,9 @@ typedef struct CliOptions
  *  Parses argv[1 .. argc-1] into *options. The pointers in options point into argv.
  *
  *  Returns false, with a message in options->error, for an unknown option or command, an option
- *  without its value, an option given twice, no command (unless --help or --version is given), or
- *  a wrong number of arguments for the command. --help and --version make the command optional.
+ *  without its value, an option given twice, --html with a command other than check, no command
+ *  (unless --help or --version is given), or a wrong number of arguments for the command.
+ *  --help and --version make the command optional.
  */
 
 [[nodiscard]] bool cli_parse ( CliOptions* options, int argc, const char* const argv[] );

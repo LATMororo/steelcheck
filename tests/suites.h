@@ -18,5 +18,10 @@ void test_number_suite    ();
 void test_section_suite   ();
 void test_database_suite  ();
 void test_cli_suite       ();
+void test_member_suite    ();
+void test_result_suite    ();
+void test_nbr8800_suite   ();
+void test_report_suite    ();
+void test_input_suite     ();
 
 #endif // STEELCHECK_SUITES_H

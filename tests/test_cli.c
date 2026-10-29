@@ -1,6 +1,7 @@
 #include "steelcheck/compat.h"
 #include "steelcheck/builtin.h"
 #include "steelcheck/database.h"
+#include "steelcheck/input.h"
 #include "suites.h"
 #include "test.h"
 
@@ -120,6 +121,29 @@ static void test_parse_show ()
   CHECK_INT_EQ ( options.arg_count, 2 );
 }
 
+static void test_parse_check ()
+{
+  const char* argv[] = { "steelcheck", "--html", "out.html", "check", "frame.toml", nullptr };
+  const char* eq[]   = { "steelcheck", "--html=out.html", "check", "frame.toml", nullptr };
+  CliOptions  options;
+
+  CHECK ( cli_parse( &options, ARGC_( argv ), argv ) );
+  CHECK_INT_EQ ( options.command, CLI_COMMAND_CHECK );
+  CHECK_STR_EQ ( options.html_path, "out.html" );
+  CHECK_INT_EQ ( options.arg_count, 1 );
+  CHECK_STR_EQ ( options.args[0], "frame.toml" );
+
+  CHECK ( cli_parse( &options, ARGC_( eq ), eq ) );
+  CHECK_STR_EQ ( options.html_path, "out.html" );
+
+  // Without --html: no HTML report.
+
+  const char* plain[] = { "steelcheck", "check", "frame.toml", nullptr };
+
+  CHECK ( cli_parse( &options, ARGC_( plain ), plain ) );
+  CHECK ( options.html_path == nullptr );
+}
+
 static void test_parse_help_version ()
 {
   const char* help[]    = { "steelcheck", "--help", nullptr };
@@ -190,6 +214,12 @@ static void test_parse_errors ()
   const char* twice[]    = { "steelcheck", "-d", "a.csv", "--db=b.csv", "list", nullptr };
   const char* no_name[]  = { "steelcheck", "show", nullptr };
   const char* too_many[] = { "steelcheck", "list", "W150", "W200", nullptr };
+  const char* no_input[] = { "steelcheck", "check", nullptr };
+  const char* inputs[]   = { "steelcheck", "check", "a.toml", "b.toml", nullptr };
+  const char* no_html[]  = { "steelcheck", "check", "a.toml", "--html", nullptr };
+  const char* html_end[] = { "steelcheck", "--html", nullptr };
+  const char* html_two[] = { "steelcheck", "--html=a", "--html", "b", "check", "x", nullptr };
+  const char* html_cmd[] = { "steelcheck", "--html", "a.html", "list", nullptr };
 
   CHECK ( rejected_( ARGC_( none ),     none,     "no command given" ) );
   CHECK ( rejected_( ARGC_( option ),   option,   "unknown option '--frobnicate'" ) );
@@ -200,6 +230,15 @@ static void test_parse_errors ()
   CHECK ( rejected_( ARGC_( no_name ),  no_name,  "'show' needs a DESIGNATION" ) );
   CHECK ( rejected_( ARGC_( too_many ), too_many,
                      "'list' takes at most one FILTER, got 2 arguments" ) );
+  CHECK ( rejected_( ARGC_( no_input ), no_input,
+                     "'check' needs exactly one INPUT file, got 0 arguments" ) );
+  CHECK ( rejected_( ARGC_( inputs ),   inputs,
+                     "'check' needs exactly one INPUT file, got 2 arguments" ) );
+  CHECK ( rejected_( ARGC_( no_html ),  no_html,
+                     "'check' needs exactly one INPUT file, got 2 arguments" ) );
+  CHECK ( rejected_( ARGC_( html_end ), html_end, "option '--html' needs a FILE" ) );
+  CHECK ( rejected_( ARGC_( html_two ), html_two, "option '--html' given twice" ) );
+  CHECK ( rejected_( ARGC_( html_cmd ), html_cmd, "option '--html' works only with 'check'" ) );
 
   // After the command, "--db" is just an argument: here a filter of list.
 
@@ -405,6 +444,111 @@ static void test_show ()
 }
 
 //==================================================================================================
+//  check
+//==================================================================================================
+
+static void test_check ()
+{
+  static char        text[output_size_ * 4];
+  static char        html[output_size_ * 8];
+  SteelCheckDatabase db      = {};
+  SteelCheckInput    input   = {};
+  CliCheckSummary    summary = {};
+
+  CHECK ( load_gerdau_( &db ) );
+  CHECK_INT_EQ ( steelcheck_input_load_file( &input, "examples/members.toml", &db, nullptr ),
+                 STEELCHECK_OK );
+
+  FILE* out  = tmpfile ();
+  FILE* page = tmpfile ();
+
+  if ( out != nullptr && page != nullptr )
+  {
+    CHECK_INT_EQ ( cli_check( out, page, &input, "members", nullptr, &summary ), STEELCHECK_OK );
+  }
+
+  CHECK ( read_back_( out, text, sizeof text ) );
+  CHECK ( read_back_( page, html, sizeof html ) );
+
+  // The example's members all pass.
+
+  CHECK_SIZE_EQ ( summary.members, 5 );
+  CHECK_SIZE_EQ ( summary.failed, 0 );
+
+  // The text: a report per member, then the table of members and the totals.
+
+  CHECK ( contains_( text, "C1: W310x52.0, ASTM A572 Gr.50, ABNT NBR 8800\n" ) );
+  CHECK ( contains_( text, "D1: W150x22.5, ASTM A36, ABNT NBR 8800\n" ) );
+  CHECK ( contains_( text, "  V2               W310x38.7    bending about x                   "
+                           "0.95  OK\n" ) );
+  CHECK ( contains_( text, "Members (ABNT NBR 8800)\n" ) );
+  CHECK ( contains_( text, "  P1               HP250x62.0   -                                    "
+                           "-  resistances only\n" ) );
+  CHECK ( contains_( text, "\n5 members checked, 0 failed\n" ) );
+
+  // The HTML page: one section per member.
+
+  CHECK ( contains_( html, "<title>members</title>" ) );
+  CHECK ( contains_( html, "W410x53.0" ) );
+  CHECK ( contains_( html, "</html>\n" ) );
+
+  steelcheck_input_free ( &input );
+
+  // A member that fails is counted; no HTML without a page.
+
+  static const char failing[] =
+    "material = \"A36\"\n"
+    "[[member]]\nlabel = \"T1\"\nsection = \"W150x13\"\nlength = 2\nNSd = 1000\n";
+
+  CHECK_INT_EQ ( steelcheck_input_load( &input, steelcheck_view_from_cstr( failing ), &db,
+                                        nullptr ),
+                 STEELCHECK_OK );
+
+  out = tmpfile ();
+
+  if ( out != nullptr )
+  {
+    CHECK_INT_EQ ( cli_check( out, nullptr, &input, "t", nullptr, &summary ), STEELCHECK_OK );
+  }
+
+  CHECK ( read_back_( out, text, sizeof text ) );
+  CHECK_SIZE_EQ ( summary.members, 1 );
+  CHECK_SIZE_EQ ( summary.failed, 1 );
+  CHECK ( contains_( text, "  T1               W150x13.0    tension" ) );
+  CHECK ( contains_( text, "FAIL\n\n1 member checked, 1 failed\n" ) );
+
+  steelcheck_input_free ( &input );
+
+  // A warning about a member (Cb below 1.0) is reported once, when the input is read, and not
+  // again when the member is checked.
+
+  static const char warned[] =
+    "material = \"A36\"\n"
+    "[[member]]\nsection = \"W150x13\"\nlength = 2\nCb = 0.8\nMxSd = 10\n";
+
+  TestCollector      collector = {};
+  SteelCheckReporter reporter  = test_reporter ( &collector );
+
+  CHECK_INT_EQ ( steelcheck_input_load( &input, steelcheck_view_from_cstr( warned ), &db,
+                                        &reporter ),
+                 STEELCHECK_OK );
+  CHECK_SIZE_EQ ( collector.warnings, 1 );
+
+  out = tmpfile ();
+
+  if ( out != nullptr )
+  {
+    CHECK_INT_EQ ( cli_check( out, nullptr, &input, "t", &reporter, &summary ), STEELCHECK_OK );
+  }
+
+  CHECK ( read_back_( out, text, sizeof text ) );
+  CHECK_SIZE_EQ ( collector.count, 1 );
+
+  steelcheck_input_free ( &input );
+  steelcheck_database_free ( &db );
+}
+
+//==================================================================================================
 //  test_cli_suite
 //==================================================================================================
 
@@ -412,6 +556,7 @@ void test_cli_suite ()
 {
   RUN_TEST ( test_parse_list );
   RUN_TEST ( test_parse_show );
+  RUN_TEST ( test_parse_check );
   RUN_TEST ( test_parse_help_version );
   RUN_TEST ( test_parse_double_dash );
   RUN_TEST ( test_parse_errors );
@@ -420,4 +565,5 @@ void test_cli_suite ()
   RUN_TEST ( test_print_diagnostic );
   RUN_TEST ( test_list );
   RUN_TEST ( test_show );
+  RUN_TEST ( test_check );
 }

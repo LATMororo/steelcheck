@@ -17,24 +17,26 @@ static bool is_option_ ( const char* arg, const char* short_name, const char* lo
 }
 
 /*
- *  Records the database path, refusing a second one. Returns false with a message on error.
+ *  Records the FILE of an option (--db or --html) in *slot, refusing an empty one or a second one.
+ *  Returns false with a message on error.
  */
 
-static bool set_db_path_ ( CliOptions* options, const char* path )
+static bool set_path_ ( CliOptions* options, const char* name, const char** slot,
+                        const char* path )
 {
   if ( path[0] == '\0' )
   {
-    snprintf ( options->error, sizeof options->error, "option '--db' needs a FILE" );
+    snprintf ( options->error, sizeof options->error, "option '%s' needs a FILE", name );
     return false;
   }
 
-  if ( options->db_path != nullptr )
+  if ( *slot != nullptr )
   {
-    snprintf ( options->error, sizeof options->error, "option '--db' given twice" );
+    snprintf ( options->error, sizeof options->error, "option '%s' given twice", name );
     return false;
   }
 
-  options->db_path = path;
+  *slot = path;
 
   return true;
 }
@@ -68,6 +70,15 @@ static bool check_arg_count_ ( CliOptions* options )
       if ( options->arg_count < 1 )
       {
         snprintf ( options->error, sizeof options->error, "'show' needs a DESIGNATION" );
+        return false;
+      }
+      return true;
+
+    case CLI_COMMAND_CHECK:
+      if ( options->arg_count != 1 )
+      {
+        snprintf ( options->error, sizeof options->error,
+                   "'check' needs exactly one INPUT file, got %d arguments", options->arg_count );
         return false;
       }
       return true;
@@ -124,14 +135,34 @@ bool cli_parse ( CliOptions* options, int argc, const char* const argv[] )
         return false;
       }
 
-      if ( !set_db_path_( options, argv[++i] ) )
+      if ( !set_path_( options, "--db", &options->db_path, argv[++i] ) )
       {
         return false;
       }
     }
     else if ( strncmp( arg, "--db=", 5 ) == 0 )
     {
-      if ( !set_db_path_( options, arg + 5 ) )
+      if ( !set_path_( options, "--db", &options->db_path, arg + 5 ) )
+      {
+        return false;
+      }
+    }
+    else if ( strcmp( arg, "--html" ) == 0 )
+    {
+      if ( i + 1 >= argc )
+      {
+        snprintf ( options->error, sizeof options->error, "option '%s' needs a FILE", arg );
+        return false;
+      }
+
+      if ( !set_path_( options, "--html", &options->html_path, argv[++i] ) )
+      {
+        return false;
+      }
+    }
+    else if ( strncmp( arg, "--html=", 7 ) == 0 )
+    {
+      if ( !set_path_( options, "--html", &options->html_path, arg + 7 ) )
       {
         return false;
       }
@@ -157,6 +188,10 @@ bool cli_parse ( CliOptions* options, int argc, const char* const argv[] )
     {
       options->command = CLI_COMMAND_SHOW;
     }
+    else if ( strcmp( command, "check" ) == 0 )
+    {
+      options->command = CLI_COMMAND_CHECK;
+    }
     else
     {
       snprintf ( options->error, sizeof options->error, "unknown command '%s'", command );
@@ -165,6 +200,13 @@ bool cli_parse ( CliOptions* options, int argc, const char* const argv[] )
 
     options->args      = &argv[i + 1];
     options->arg_count = argc - i - 1;
+  }
+
+  if ( options->html_path != nullptr && options->command != CLI_COMMAND_CHECK
+       && !options->help && !options->version )
+  {
+    snprintf ( options->error, sizeof options->error, "option '--html' works only with 'check'" );
+    return false;
   }
 
   return check_arg_count_( options );

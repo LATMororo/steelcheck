@@ -1,40 +1,16 @@
 #include "cli/commands.h"
 
 #include "steelcheck/builtin.h"
+#include "steelcheck/code.h"
+#include "steelcheck/report.h"
 
-#include <math.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 //==================================================================================================
 //  Private helpers
 //==================================================================================================
-
-/*
- *  Size of the text of one formatted number.
- */
-
-constexpr size_t number_size_ = 32;
-
-/*
- *  Formats a value the way catalogs print it: up to 4 significant digits below 1000 (6.18, 85.8,
- *  0.67), whole numbers above (8581, 14676643), with one decimal if it has one (1597.4).
- */
-
-static void format_number_ ( double value, char* text, size_t size )
-{
-  if ( fabs( value ) < 1000.0 )
-  {
-    snprintf ( text, size, "%.4g", value );
-  }
-  else if ( fabs( value - round( value ) ) < 1e-6 * fabs( value ) )
-  {
-    snprintf ( text, size, "%.0f", value );
-  }
-  else
-  {
-    snprintf ( text, size, "%.1f", value );
-  }
-}
 
 /*
  *  The designation filter as a prefix to compare with designation keys: without spaces and tabs,
@@ -75,18 +51,19 @@ static bool filter_prefix_ ( const char* filter, char* prefix, size_t size )
 
 static void show_field_ ( FILE* out, const SteelCheckSection* section, SteelCheckField field )
 {
-  const SteelCheckFieldInfo* info = steelcheck_field_info ( field );
-  char                       number[number_size_] = "-";
-  const char*                note = "";
+  const SteelCheckFieldInfo* info  = steelcheck_field_info ( field );
+  double                     value = steelcheck_section_value ( section, field );
+  const char*                note  = "";
+  char                       number[steelcheck_number_text_size] = "-";
 
   if ( steelcheck_section_was_computed( section, field ) )
   {
-    format_number_ ( steelcheck_section_value( section, field ), number, sizeof number );
+    steelcheck_format_number ( value, number, sizeof number );
     note = " (computed)";
   }
   else if ( steelcheck_section_has( section, field ) )
   {
-    format_number_ ( steelcheck_section_value( section, field ), number, sizeof number );
+    steelcheck_format_number ( value, number, sizeof number );
   }
 
   fprintf ( out, "    %-7s %10s  %-6s %s%s\n", info->symbol, number, info->unit,
@@ -213,9 +190,10 @@ size_t cli_list ( FILE* out, const SteelCheckDatabase* db, const char* filter )
 
     for ( size_t c = 0; c < column_count; c++ )
     {
-      char number[number_size_];
+      char   number[steelcheck_number_text_size];
+      double value = steelcheck_section_value ( s, columns[c] );
 
-      format_number_ ( steelcheck_section_value( s, columns[c] ), number, sizeof number );
+      steelcheck_format_number ( value, number, sizeof number );
       fprintf ( out, " %9s", number );
     }
 
@@ -317,11 +295,11 @@ bool cli_show ( FILE* out, const SteelCheckDatabase* db, const char* designation
 
   // Derived values, which have no CSV column.
 
-  char h0[number_size_];
-  char r0[number_size_];
+  char h0[steelcheck_number_text_size];
+  char r0[steelcheck_number_text_size];
 
-  format_number_ ( s->h0, h0, sizeof h0 );
-  format_number_ ( s->r0 / 10.0, r0, sizeof r0 );   // mm -> cm, like rx and ry
+  steelcheck_format_number ( s->h0, h0, sizeof h0 );
+  steelcheck_format_number ( s->r0 / 10.0, r0, sizeof r0 );   // mm -> cm, like rx and ry
 
   fprintf ( out, "\n  Derived\n" );
   fprintf ( out, "    %-7s %10s  %-6s %s\n", "h0", h0, "mm", "distance between flange centroids" );
@@ -349,4 +327,147 @@ bool cli_show ( FILE* out, const SteelCheckDatabase* db, const char* designation
   fprintf ( out, "\n" );
 
   return true;
+}
+
+//==================================================================================================
+//  cli_check
+//==================================================================================================
+
+/*
+ *  What the summary at the end of the check command shows of one member.
+ */
+
+typedef struct MemberSummary_
+{
+  bool                has_governing;
+  SteelCheckCheckKind governing;
+  double              utilization;
+  bool                failed;
+} MemberSummary_;
+
+/*
+ *  A reporter that forwards only errors to another one (the context). The driver validates each
+ *  member again, and its warnings were already reported when the input file was read.
+ */
+
+static void errors_only_ ( void* context, const SteelCheckDiagnostic* diagnostic )
+{
+  const SteelCheckReporter* target = context;
+
+  if ( diagnostic->severity == STEELCHECK_SEVERITY_ERROR && target != nullptr
+       && target->report != nullptr )
+  {
+    target->report ( target->context, diagnostic );
+  }
+}
+
+SteelCheckStatus cli_check ( FILE* out, FILE* html, const SteelCheckInput* input,
+                             const char* title, const SteelCheckReporter* reporter,
+                             CliCheckSummary* summary )
+{
+  *summary = (CliCheckSummary) {};
+
+  // The governing check of each member, kept for the summary at the end: the results themselves
+  // are freed member by member, since their traces can be long.
+
+  MemberSummary_* rows = calloc ( input->count > 0 ? input->count : 1, sizeof *rows );
+
+  if ( rows == nullptr )
+  {
+    return STEELCHECK_ERROR_NO_MEMORY;
+  }
+
+  if ( html != nullptr )
+  {
+    steelcheck_report_html_begin ( html, title );
+  }
+
+  // The reporter is only read through the pointer, but the context is a void*: C has no
+  // const void* contexts here, so the qualifier is removed with an explicit cast.
+
+  SteelCheckReporter errors = { .report = errors_only_, .context = (void*) (uintptr_t) reporter };
+
+  for ( size_t i = 0; i < input->count; i++ )
+  {
+    const SteelCheckMember* member = &input->members[i];
+    SteelCheckResult        result = {};
+    SteelCheckStatus        status = steelcheck_check_member ( input->code, member, &result,
+                                                               &errors );
+
+    if ( status != STEELCHECK_OK )
+    {
+      free ( rows );
+      return status;
+    }
+
+    if ( i > 0 )
+    {
+      fprintf ( out, "\n" );
+    }
+
+    steelcheck_report_text ( out, member, &result );
+
+    if ( html != nullptr )
+    {
+      steelcheck_report_html_member ( html, member, &result );
+    }
+
+    rows[i] = (MemberSummary_)
+    {
+      .has_governing = result.has_governing,
+      .governing     = result.governing,
+      .utilization   = result.utilization,
+    };
+
+    for ( int k = 0; k < STEELCHECK_CHECK_COUNT; k++ )
+    {
+      if ( result.checks[k].status == STEELCHECK_CHECK_FAIL )
+      {
+        rows[i].failed = true;
+      }
+    }
+
+    summary->members++;
+    summary->failed += rows[i].failed ? 1 : 0;
+
+    steelcheck_result_free ( &result );
+  }
+
+  if ( html != nullptr )
+  {
+    steelcheck_report_html_end ( html );
+  }
+
+  // The summary of all members.
+
+  fprintf ( out, "\n======================================================================"
+                 "==========\n" );
+  fprintf ( out, "Members (%s)\n", input->code->name );
+  fprintf ( out, "  %-16s %-12s %-26s %11s  %s\n", "member", "section", "governing check",
+            "utilization", "status" );
+
+  for ( size_t i = 0; i < input->count; i++ )
+  {
+    const SteelCheckMember* member = &input->members[i];
+    const MemberSummary_*   row    = &rows[i];
+
+    if ( row->has_governing )
+    {
+      fprintf ( out, "  %-16s %-12s %-26s %11.2f  %s\n", member->label,
+                member->section->designation, steelcheck_check_kind_name( row->governing ),
+                row->utilization, row->failed ? "FAIL" : "OK" );
+    }
+    else
+    {
+      fprintf ( out, "  %-16s %-12s %-26s %11s  %s\n", member->label,
+                member->section->designation, "-", "-", "resistances only" );
+    }
+  }
+
+  fprintf ( out, "\n%zu member%s checked, %zu failed\n", summary->members,
+            summary->members == 1 ? "" : "s", summary->failed );
+
+  free ( rows );
+
+  return STEELCHECK_OK;
 }

@@ -1,6 +1,7 @@
 #include "steelcheck/compat.h"
 #include "steelcheck/builtin.h"
 #include "steelcheck/database.h"
+#include "steelcheck/input.h"
 #include "steelcheck/version.h"
 
 #include "cli/args.h"
@@ -18,6 +19,7 @@ enum steelcheck_exit : int
   STEELCHECK_EXIT_SUCCESS       = 0,
   STEELCHECK_EXIT_RUNTIME_ERROR = 1,
   STEELCHECK_EXIT_USAGE_ERROR   = 2,
+  STEELCHECK_EXIT_CHECK_FAILED  = 3,   // the check ran, and at least one member fails
 };
 
 /*
@@ -26,6 +28,12 @@ enum steelcheck_exit : int
 
 constexpr size_t designation_size_ = 128;
 
+/*
+ *  Size of the title of the HTML report, including its '\0' (a longer one is cut short).
+ */
+
+constexpr size_t title_size_ = 256;
+
 //==================================================================================================
 //  print_usage_
 //==================================================================================================
@@ -33,20 +41,26 @@ constexpr size_t designation_size_ = 128;
 static void print_usage_ ( FILE* stream )
 {
   fputs ( "Usage: steelcheck [OPTIONS] COMMAND [ARGUMENTS]\n"
-          "Check W and HP steel cross sections (ABNT NBR 8800:2024).\n"
+          "Check W and HP steel members (ABNT NBR 8800:2024).\n"
           "\n"
           "Commands:\n"
           "  list [FILTER]        list the sections whose designation starts with FILTER\n"
           "                       (e.g. W310, HP); all sections without FILTER\n"
           "  show DESIGNATION     show every property of one section, e.g. W310x38.7\n"
           "                       (spaces, lower case and a decimal comma are accepted)\n"
+          "  check INPUT          check the members of the INPUT file (TOML, see\n"
+          "                       examples/members.toml) and print their reports\n"
           "\n"
           "Options:\n"
           "  -d, --db FILE        section database (CSV); default: $STEELCHECK_DB, else the\n"
           "                       built-in Gerdau catalog (if this build has one)\n"
-          "  -q, --quiet          do not print warnings about the database\n"
+          "      --html FILE      check: also write the reports to FILE as an HTML page\n"
+          "  -q, --quiet          do not print warnings\n"
           "  -h, --help           show this help and exit\n"
-          "  -V, --version        show version and build information and exit\n",
+          "  -V, --version        show version and build information and exit\n"
+          "\n"
+          "Exit status: 0 success, 1 runtime error, 2 usage error, 3 a member fails a check.\n"
+          "Formulas and clause numbers: ABNT NBR 8800:2024.\n",
           stream );
 }
 
@@ -69,6 +83,75 @@ static void print_version_ ()
   printf ( "%s\n", steelcheck_build_info() );
   printf ( "built-in section database: %s\n",
            steelcheck_builtin_available() ? "yes" : "no (the compiler has no #embed)" );
+}
+
+//==================================================================================================
+//  run_check_
+//==================================================================================================
+
+/*
+ *  The check command: reads the input file, writes the reports, and returns the exit code.
+ */
+
+static int run_check_ ( const CliOptions* options, const SteelCheckDatabase* db )
+{
+  const char*        path     = options->args[0];
+  CliPrinter         printer  = { .stream = stderr, .source = path, .quiet = options->quiet };
+  SteelCheckReporter reporter = { .report = cli_print_diagnostic, .context = &printer };
+  SteelCheckInput    input    = {};
+
+  if ( steelcheck_input_load_file( &input, path, db, &reporter ) != STEELCHECK_OK )
+  {
+    fprintf ( stderr, "steelcheck: cannot use the input file %s\n", path );
+    return STEELCHECK_EXIT_RUNTIME_ERROR;
+  }
+
+  // The HTML report, if asked for: opened before the check, so that a wrong path is found before
+  // any work is done.
+
+  FILE* html = nullptr;
+
+  if ( options->html_path != nullptr )
+  {
+    html = fopen ( options->html_path, "w" );
+
+    if ( html == nullptr )
+    {
+      fprintf ( stderr, "steelcheck: cannot create %s\n", options->html_path );
+      steelcheck_input_free ( &input );
+      return STEELCHECK_EXIT_RUNTIME_ERROR;
+    }
+  }
+
+  char title[title_size_];
+
+  snprintf ( title, sizeof title, "steelcheck: %s", path );
+
+  CliCheckSummary  summary = {};
+  SteelCheckStatus status  = cli_check ( stdout, html, &input, title, &reporter, &summary );
+  int              code    = STEELCHECK_EXIT_SUCCESS;
+
+  if ( status != STEELCHECK_OK )
+  {
+    fprintf ( stderr, "steelcheck: %s\n", steelcheck_status_message( status ) );
+    code = STEELCHECK_EXIT_RUNTIME_ERROR;
+  }
+  else if ( summary.failed > 0 )
+  {
+    code = STEELCHECK_EXIT_CHECK_FAILED;
+  }
+
+  // fclose writes what is still buffered: a full disk shows up here, not in fprintf.
+
+  if ( html != nullptr && fclose( html ) != 0 )
+  {
+    fprintf ( stderr, "steelcheck: cannot write %s\n", options->html_path );
+    code = STEELCHECK_EXIT_RUNTIME_ERROR;
+  }
+
+  steelcheck_input_free ( &input );
+
+  return code;
 }
 
 //==================================================================================================
@@ -121,6 +204,9 @@ static int run_command_ ( const CliOptions* options, const SteelCheckDatabase* d
 
       return STEELCHECK_EXIT_SUCCESS;
     }
+
+    case CLI_COMMAND_CHECK:
+      return run_check_ ( options, db );
   }
 
   return STEELCHECK_EXIT_SUCCESS;

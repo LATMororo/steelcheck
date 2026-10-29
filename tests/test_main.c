@@ -19,6 +19,11 @@ int main ()
   test_section_suite ();
   test_database_suite ();
   test_cli_suite ();
+  test_member_suite ();
+  test_result_suite ();
+  test_nbr8800_suite ();
+  test_report_suite ();
+  test_input_suite ();
 
   return test_summary ();
 }

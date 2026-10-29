@@ -4,6 +4,8 @@
 #include "steelcheck/compat.h"
 #include "steelcheck/database.h"
 #include "steelcheck/diagnostic.h"
+#include "steelcheck/input.h"
+#include "steelcheck/status.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -69,5 +71,27 @@ size_t cli_list ( FILE* out, const SteelCheckDatabase* db, const char* filter );
 
 [[nodiscard]] bool cli_show ( FILE* out, const SteelCheckDatabase* db, const char* designation,
                               const char* source );
+
+/*
+ *  What the check command found.
+ */
+
+typedef struct CliCheckSummary
+{
+  size_t members;   // members checked
+  size_t failed;    // members with at least one check that FAILs
+} CliCheckSummary;
+
+/*
+ *  Checks every member of input against its code. Writes the text report of each member to out,
+ *  then a table with the governing check of each member, and the totals; if html is not nullptr,
+ *  also writes a whole HTML page (titled title) to it. Returns STEELCHECK_OK and fills *summary,
+ *  or the status of the first member that could not be checked (out of memory; the input was
+ *  validated on loading).
+ */
+
+[[nodiscard]] SteelCheckStatus cli_check ( FILE* out, FILE* html, const SteelCheckInput* input,
+                                           const char* title, const SteelCheckReporter* reporter,
+                                           CliCheckSummary* summary );
 
 #endif // STEELCHECK_CLI_COMMANDS_H
